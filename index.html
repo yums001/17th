@@ -1,0 +1,1867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Find Me — A Gift for Avril</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    :root {
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --ui-pad: 12px;
+      --btn-size: 72px;
+      --joystick-size: 120px;
+      --warm-bg: #f9e7d2;
+      --warm-text: #4a2e1b;
+      --pixel-font: 'Press Start 2P', 'Courier New', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: var(--pixel-font);
+      touch-action: none;
+      overscroll-behavior: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #game-container {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+
+    #game-container canvas {
+      display: block;
+      pointer-events: none;
+    }
+
+    #ui-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      color: #fff;
+    }
+
+    /* ---------- Start overlay ---------- */
+    #start-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      background: radial-gradient(circle at 50% 30%, #1b2a3a 0%, #070b10 100%);
+      padding: 20px;
+      transition: opacity 0.8s ease;
+    }
+
+    #start-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    #start-overlay h1 {
+      font-size: clamp(26px, 8vw, 52px);
+      letter-spacing: 6px;
+      color: #ffe8c2;
+      text-shadow: 0 0 18px rgba(255, 200, 120, 0.6);
+      margin-bottom: 20px;
+    }
+
+    #start-overlay p {
+      font-size: 12px;
+      color: #d8cbb6;
+      margin-bottom: 30px;
+      line-height: 1.8;
+    }
+
+    #start-btn {
+      pointer-events: auto;
+      min-width: 190px;
+      min-height: 54px;
+      background: #e8a0b4;
+      border: 3px solid #ffe8c2;
+      border-radius: 999px;
+      color: #3a1a1a;
+      font-family: var(--pixel-font);
+      font-size: 14px;
+      letter-spacing: 2px;
+      padding: 0 24px;
+      cursor: pointer;
+      box-shadow: 0 0 25px rgba(232, 160, 180, 0.45);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    #start-btn:active { transform: scale(0.96); box-shadow: 0 0 12px rgba(232, 160, 180, 0.25); }
+
+    /* ---------- Orientation overlay ---------- */
+    #rotate-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 40;
+      background: #0b1018;
+      color: #ffe8c2;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px;
+      pointer-events: auto;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    #rotate-overlay.active { display: flex; }
+
+    /* ---------- Mute button ---------- */
+    #mute-btn {
+      position: absolute;
+      top: calc(var(--safe-top) + 10px);
+      right: calc(var(--safe-right) + 10px);
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      min-height: 48px;
+      pointer-events: auto;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 232, 194, 0.6);
+      background: rgba(0, 0, 0, 0.35);
+      color: #ffe8c2;
+      font-size: 22px;
+      cursor: pointer;
+      z-index: 25;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    #mute-btn:active { background: rgba(255, 232, 194, 0.2); }
+
+    /* ---------- Joystick ---------- */
+    #joystick-zone {
+      position: absolute;
+      left: calc(var(--safe-left) + 16px);
+      bottom: calc(var(--safe-bottom) + 24px);
+      width: var(--joystick-size);
+      height: var(--joystick-size);
+      pointer-events: auto;
+      z-index: 22;
+      transition: opacity 0.6s;
+    }
+
+    #joystick-zone.disabled { opacity: 0.35; pointer-events: none; }
+    #joystick-zone.fade-out { opacity: 0; pointer-events: none; }
+
+    #joystick-base {
+      position: absolute;
+      inset: 50% 50% 50% 50%;
+      width: calc(var(--joystick-size) - 20px);
+      height: calc(var(--joystick-size) - 20px);
+      margin: calc((var(--joystick-size) - 20px) / -2) 0 0 calc((var(--joystick-size) - 20px) / -2);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #joystick-thumb {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: rgba(255, 232, 194, 0.7);
+      border: 2px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 0 12px rgba(255, 200, 120, 0.4);
+      transform: translate(0, 0);
+      transition: transform 0.03s linear;
+      pointer-events: none;
+    }
+
+    /* ---------- Interact button ---------- */
+    #interact-btn {
+      position: absolute;
+      right: calc(var(--safe-right) + 16px);
+      bottom: calc(var(--safe-bottom) + 34px);
+      width: var(--btn-size);
+      height: var(--btn-size);
+      min-width: 64px;
+      min-height: 64px;
+      pointer-events: auto;
+      border-radius: 50%;
+      background: rgba(20, 20, 30, 0.55);
+      border: 2px solid rgba(255, 232, 194, 0.65);
+      color: #ffe8c2;
+      font-size: 13px;
+      font-family: var(--pixel-font);
+      cursor: pointer;
+      z-index: 22;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      transition: opacity 0.4s, transform 0.15s, background 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      line-height: 1.4;
+      padding: 8px;
+    }
+
+    #interact-btn.active {
+      background: rgba(232, 160, 180, 0.35);
+      border-color: #ffe8c2;
+      box-shadow: 0 0 18px rgba(255, 200, 160, 0.45);
+    }
+
+    #interact-btn.dialogue-mode {
+      background: rgba(255, 232, 194, 0.18);
+      border-color: #fff;
+    }
+
+    #interact-btn:active { transform: scale(0.92); }
+    #interact-btn.fade-out { opacity: 0; pointer-events: none; }
+
+    /* ---------- Dialogue overlay ---------- */
+    #dialogue-overlay {
+      position: absolute;
+      left: 50%;
+      bottom: calc(var(--safe-bottom) + 16px);
+      transform: translateX(-50%);
+      width: min(92vw, 720px);
+      pointer-events: auto;
+      background: rgba(15, 15, 25, 0.78);
+      border: 2px solid rgba(255, 232, 194, 0.5);
+      border-radius: 18px;
+      padding: 14px 16px;
+      z-index: 24;
+      color: #fff3e0;
+      display: none;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    #dialogue-overlay.active { display: block; }
+
+    #dialogue-speaker {
+      font-size: 11px;
+      color: #ffd9a0;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    #dialogue-text {
+      font-size: 14px;
+      line-height: 1.7;
+      min-height: 48px;
+      color: #fff3e0;
+      white-space: pre-wrap;
+    }
+
+    /* ---------- Memory overlay ---------- */
+    #memory-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: auto;
+      background: linear-gradient(135deg, #f6d9b2 0%, #f2c6a8 45%, #e7b89a 100%);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 28;
+      text-align: center;
+      padding: 30px;
+    }
+
+    #memory-overlay.active { display: flex; }
+
+    #memory-text {
+      font-size: clamp(16px, 4.5vw, 26px);
+      color: #4a2e1b;
+      line-height: 1.8;
+      text-shadow: 0 2px 10px rgba(255, 255, 255, 0.35);
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      max-width: 90vw;
+    }
+
+    /* ---------- Letter overlay ---------- */
+    #letter-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: auto;
+      background: var(--warm-bg);
+      color: var(--warm-text);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 29;
+      padding: 20px;
+    }
+
+    #letter-overlay.active { display: flex; }
+
+    #letter-box {
+      width: min(92vw, 640px);
+      max-height: 80vh;
+      overflow-y: auto;
+      background: rgba(255, 250, 240, 0.65);
+      border: 3px solid #d8b99a;
+      border-radius: 18px;
+      padding: 24px 20px;
+      box-shadow: 0 10px 40px rgba(80, 40, 10, 0.15);
+      text-align: left;
+    }
+
+    #letter-text {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: clamp(14px, 3.8vw, 18px);
+      line-height: 1.9;
+      color: #4a2e1b;
+      white-space: pre-wrap;
+      min-height: 180px;
+    }
+
+    #letter-btn {
+      display: none;
+      margin-top: 22px;
+      min-width: 160px;
+      min-height: 52px;
+      background: #e8a0b4;
+      border: 3px solid #fff0e0;
+      border-radius: 999px;
+      color: #3a1a1a;
+      font-family: var(--pixel-font);
+      font-size: 12px;
+      padding: 0 18px;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(232, 160, 180, 0.35);
+    }
+
+    #letter-btn:active { transform: scale(0.96); }
+
+    /* ---------- Centered text overlay ---------- */
+    #final-text-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 26;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 30px;
+      text-align: center;
+    }
+
+    #final-text-overlay.active { display: flex; }
+
+    #final-text {
+      font-size: clamp(18px, 5.5vw, 32px);
+      color: #fff3e0;
+      text-shadow: 0 0 20px rgba(255, 220, 160, 0.65);
+      line-height: 1.8;
+      letter-spacing: 2px;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+
+    /* ---------- End overlay ---------- */
+    #end-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: auto;
+      background: radial-gradient(circle at 50% 35%, #1b2a3a 0%, #070b10 100%);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      text-align: center;
+      padding: 20px;
+      z-index: 31;
+    }
+
+    #end-overlay.active { display: flex; }
+
+    #end-overlay h1 {
+      font-size: clamp(24px, 7vw, 44px);
+      letter-spacing: 5px;
+      color: #ffe8c2;
+      margin-bottom: 16px;
+      text-shadow: 0 0 18px rgba(255, 200, 120, 0.6);
+    }
+
+    #end-overlay p {
+      font-size: 12px;
+      color: #d8cbb6;
+      margin-bottom: 30px;
+      line-height: 1.8;
+    }
+
+    #play-again-btn {
+      min-width: 160px;
+      min-height: 52px;
+      background: #e8a0b4;
+      border: 3px solid #ffe8c2;
+      border-radius: 999px;
+      color: #3a1a1a;
+      font-family: var(--pixel-font);
+      font-size: 13px;
+      padding: 0 18px;
+      cursor: pointer;
+    }
+
+    #play-again-btn:active { transform: scale(0.96); }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <div id="ui-overlay">
+    <div id="rotate-overlay">
+      <div>🌙 Please rotate your phone back to portrait for the best experience.</div>
+    </div>
+
+    <button id="mute-btn" aria-label="Mute or unmute">🔊</button>
+
+    <div id="joystick-zone" class="disabled">
+      <div id="joystick-base">
+        <div id="joystick-thumb"></div>
+      </div>
+    </div>
+
+    <button id="interact-btn" class="disabled">💬</button>
+
+    <div id="dialogue-overlay">
+      <div id="dialogue-speaker"></div>
+      <div id="dialogue-text"></div>
+    </div>
+
+    <div id="memory-overlay">
+      <div id="memory-text"></div>
+    </div>
+
+    <div id="letter-overlay">
+      <div id="letter-box">
+        <div id="letter-text"></div>
+        <button id="letter-btn">One More Thing...</button>
+      </div>
+    </div>
+
+    <div id="final-text-overlay">
+      <div id="final-text"></div>
+    </div>
+
+    <div id="end-overlay">
+      <h1>FIND ME</h1>
+      <p>Made with love, for Avril.</p>
+      <button id="play-again-btn">Play Again</button>
+    </div>
+
+    <div id="start-overlay">
+      <h1>FIND ME</h1>
+      <p>A short cozy journey made for Avril.<br />Tap below to begin.</p>
+      <button id="start-btn">Start</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <script>
+    // =====================================================================
+    //  EDIT YOUR LETTER AND PERSONAL DETAILS HERE
+    // =====================================================================
+    const MY_NAME = 'Kael'; // <-- change this to your name
+    const AVRIL_NAME = 'Avril';
+    const ANNIVERSARY_TEXT = 'Happy 17 Months ❤️';
+
+    const LETTER_PARAGRAPHS = [
+      'Happy 17 Months, my love.',
+      '',
+      'If you ever wondered where I was...',
+      'I was always somewhere hoping you\'d find me.',
+      '',
+      'Maybe that\'s what these 17 months have felt like sometimes.',
+      'Two people trying to find their way through distance, busy days, missed moments, and everything life puts between them.',
+      '',
+      'But somehow, we always find our way back to each other.',
+      '',
+      'Thank you for every conversation.',
+      'Every laugh.',
+      'Every little memory.',
+      'Every moment you made an ordinary day feel special.',
+      '',
+      'Thank you for staying.',
+      '',
+      'And if I could choose one thing...',
+      'It would be to keep finding you, again and again, no matter how far apart we are.',
+      '',
+      'Because if finding you means crossing every distance...',
+      'I\'d do it.',
+      'Every time.',
+      '',
+      'Happy 17 Months, Avril.',
+      'I love you.'
+    ];
+    // =====================================================================
+
+    // Game state bridge between DOM and Phaser.
+    const Game = {
+      scene: null,
+      audio: null,
+      controlsEnabled: false,
+      dialogueActive: false,
+      inCinematic: false,
+      inputVector: { x: 0, y: 0 },
+      interactPressed: false
+    };
+
+    // ---------------------------------------------------------------
+    //  Audio Manager — tiny WebAudio synth for gentle background music
+    // ---------------------------------------------------------------
+    class AudioManager {
+      constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.musicGain = null;
+        this.sfxGain = null;
+        this.muted = false;
+        this.mood = 'title';
+        this.timer = null;
+        this.step = 0;
+      }
+
+      start() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.value = 1;
+          this.masterGain.connect(this.ctx.destination);
+
+          this.musicGain = this.ctx.createGain();
+          this.musicGain.gain.value = 0.28;
+          this.musicGain.connect(this.masterGain);
+
+          this.sfxGain = this.ctx.createGain();
+          this.sfxGain.gain.value = 0.45;
+          this.sfxGain.connect(this.masterGain);
+
+          this.scheduleMusic();
+        }
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+      }
+
+      setMood(mood) {
+        this.mood = mood;
+        this.step = 0;
+      }
+
+      scheduleMusic() {
+        const stepDuration = 620; // ms per gentle note
+        if (this.timer) clearInterval(this.timer);
+        this.timer = setInterval(() => {
+          if (this.muted || !this.ctx || this.ctx.state !== 'running') return;
+          const notes = this.getMoodNotes();
+          const freq = notes[this.step % notes.length];
+          this.playTone(freq, stepDuration * 1.9, 'sine', this.musicGain, 0.075);
+
+          if (this.step % 4 === 0) {
+            this.playTone(freq / 2, stepDuration * 3.2, 'triangle', this.musicGain, 0.05);
+          }
+
+          // occasional soft high sparkle
+          if (this.step % 8 === 4) {
+            this.playTone(freq * 2, stepDuration * 1.2, 'sine', this.musicGain, 0.025);
+          }
+
+          this.step++;
+        }, stepDuration);
+      }
+
+      getMoodNotes() {
+        switch (this.mood) {
+          case 'opening': return [261.63, 329.63, 392.00, 523.25]; // C E G C
+          case 'day': return [329.63, 392.00, 493.88, 659.25]; // E G B E
+          case 'night': return [293.66, 349.23, 440.00, 587.33]; // D F A D
+          case 'memory': return [261.63, 329.63, 392.00, 523.25];
+          case 'final': return [392.00, 493.88, 587.33, 783.99];
+          case 'letter': return [261.63, 329.63, 392.00, 523.25];
+          case 'ending': return [349.23, 440.00, 587.33, 698.46];
+          default: return [329.63, 392.00, 493.88, 659.25];
+        }
+      }
+
+      playTone(freq, dur, type, dest, volume) {
+        if (!this.ctx || this.muted) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(volume, this.ctx.currentTime + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + dur);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(this.ctx.currentTime);
+        osc.stop(this.ctx.currentTime + dur + 0.05);
+      }
+
+      playSFX(name) {
+        if (!this.ctx || this.muted) return;
+        const now = this.ctx.currentTime;
+        if (name === 'interact') {
+          this.playTone(660, 0.18, 'sine', this.sfxGain, 0.2);
+          this.playTone(880, 0.22, 'sine', this.sfxGain, 0.15);
+        } else if (name === 'clue') {
+          this.playTone(523.25, 0.25, 'sine', this.sfxGain, 0.18);
+          this.playTone(659.25, 0.3, 'sine', this.sfxGain, 0.16);
+          this.playTone(783.99, 0.35, 'sine', this.sfxGain, 0.12);
+        } else if (name === 'memory') {
+          this.playTone(392, 0.35, 'sine', this.sfxGain, 0.15);
+          this.playTone(493.88, 0.4, 'sine', this.sfxGain, 0.13);
+        } else if (name === 'soft') {
+          this.playTone(440, 0.35, 'sine', this.sfxGain, 0.12);
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        if (this.masterGain) this.masterGain.gain.value = this.muted ? 0 : 1;
+      }
+    }
+
+    Game.audio = new AudioManager();
+
+    // ---------------------------------------------------------------
+    //  DOM controls (joystick, interact, dialogue, letter, overlays)
+    // ---------------------------------------------------------------
+    const joystickZone = document.getElementById('joystick-zone');
+    const joystickBase = document.getElementById('joystick-base');
+    const joystickThumb = document.getElementById('joystick-thumb');
+    const interactBtn = document.getElementById('interact-btn');
+    const dialogueOverlay = document.getElementById('dialogue-overlay');
+    const dialogueSpeaker = document.getElementById('dialogue-speaker');
+    const dialogueText = document.getElementById('dialogue-text');
+    const memoryOverlay = document.getElementById('memory-overlay');
+    const memoryText = document.getElementById('memory-text');
+    const letterOverlay = document.getElementById('letter-overlay');
+    const letterText = document.getElementById('letter-text');
+    const letterBtn = document.getElementById('letter-btn');
+    const finalTextOverlay = document.getElementById('final-text-overlay');
+    const finalText = document.getElementById('final-text');
+    const endOverlay = document.getElementById('end-overlay');
+    const startOverlay = document.getElementById('start-overlay');
+    const startBtn = document.getElementById('start-btn');
+    const muteBtn = document.getElementById('mute-btn');
+    const rotateOverlay = document.getElementById('rotate-overlay');
+
+    let joystickTouchId = null;
+    const JOY_MAX_RADIUS = 38;
+
+    function getJoystickCenter() {
+      const rect = joystickBase.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    }
+
+    function updateJoystickFromPoint(clientX, clientY) {
+      if (!Game.controlsEnabled || Game.dialogueActive || Game.inCinematic) {
+        Game.inputVector = { x: 0, y: 0 };
+        return;
+      }
+      const center = getJoystickCenter();
+      const dx = clientX - center.x;
+      const dy = clientY - center.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const clamped = Math.min(dist, JOY_MAX_RADIUS);
+      const angle = Math.atan2(dy, dx);
+      const tx = Math.cos(angle) * clamped;
+      const ty = Math.sin(angle) * clamped;
+
+      joystickThumb.style.transform = `translate(${tx}px, ${ty}px)`;
+
+      if (dist < 1) {
+        Game.inputVector = { x: 0, y: 0 };
+      } else {
+        let nx = dx / JOY_MAX_RADIUS;
+        let ny = dy / JOY_MAX_RADIUS;
+        const len = Math.sqrt(nx * nx + ny * ny);
+        if (len > 1) { nx /= len; ny /= len; }
+        Game.inputVector = { x: nx, y: ny };
+      }
+    }
+
+    function resetJoystick() {
+      joystickTouchId = null;
+      joystickThumb.style.transform = 'translate(0, 0)';
+      Game.inputVector = { x: 0, y: 0 };
+      joystickBase.classList.remove('active');
+    }
+
+    joystickZone.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (!Game.controlsEnabled || Game.dialogueActive || Game.inCinematic) return;
+      const touch = e.changedTouches[0];
+      joystickTouchId = touch.identifier;
+      joystickBase.classList.add('active');
+      updateJoystickFromPoint(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    joystickZone.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (const touch of e.changedTouches) {
+        if (touch.identifier === joystickTouchId) {
+          updateJoystickFromPoint(touch.clientX, touch.clientY);
+        }
+      }
+    }, { passive: false });
+
+    joystickZone.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      for (const touch of e.changedTouches) {
+        if (touch.identifier === joystickTouchId) resetJoystick();
+      }
+    }, { passive: false });
+
+    joystickZone.addEventListener('touchcancel', resetJoystick);
+
+    // Mouse / desktop joystick support
+    joystickZone.addEventListener('mousedown', (e) => {
+      if (!Game.controlsEnabled || Game.dialogueActive || Game.inCinematic) return;
+      joystickTouchId = 'mouse';
+      joystickBase.classList.add('active');
+      updateJoystickFromPoint(e.clientX, e.clientY);
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (joystickTouchId === 'mouse') updateJoystickFromPoint(e.clientX, e.clientY);
+    });
+    window.addEventListener('mouseup', () => {
+      if (joystickTouchId === 'mouse') resetJoystick();
+    });
+
+    // Interact button
+    function handleInteractDown(e) {
+      e.preventDefault();
+      Game.interactPressed = true;
+      if (Game.scene && Game.scene.handleInteract) Game.scene.handleInteract();
+    }
+
+    interactBtn.addEventListener('touchstart', handleInteractDown, { passive: false });
+    interactBtn.addEventListener('mousedown', handleInteractDown);
+    interactBtn.addEventListener('touchend', (e) => { e.preventDefault(); Game.interactPressed = false; });
+    interactBtn.addEventListener('mouseup', () => { Game.interactPressed = false; });
+
+    // Dialogue tap-to-continue
+    dialogueOverlay.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (Game.scene && Game.dialogueActive) Game.scene.advanceDialogue();
+    });
+
+    // Letter overlay tap-to-skip typewriter
+    letterOverlay.addEventListener('click', (e) => {
+      if (e.target === letterOverlay || e.target === letterText || e.target.id === 'letter-box') {
+        if (letterTyping) skipLetterTyping();
+      }
+    });
+
+    // Letter button
+    letterBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      letterOverlay.classList.remove('active');
+      if (Game.scene && Game.scene.showFinalScene) Game.scene.showFinalScene();
+    });
+
+    // Mute
+    muteBtn.addEventListener('click', () => {
+      Game.audio.toggleMute();
+      muteBtn.textContent = Game.audio.muted ? '🔇' : '🔊';
+    });
+
+    // Play again
+    document.getElementById('play-again-btn').addEventListener('click', () => {
+      location.reload();
+    });
+
+    // Start overlay
+    startBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      Game.audio.start();
+      Game.audio.setMood('opening');
+      startOverlay.classList.add('hidden');
+      if (Game.scene && Game.scene.startOpening) Game.scene.startOpening();
+    });
+
+    // Orientation guard (touch devices only)
+    function checkOrientation() {
+      const isTouch = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+      const isLandscape = window.innerWidth > window.innerHeight;
+      rotateOverlay.classList.toggle('active', isTouch && isLandscape);
+    }
+    window.addEventListener('resize', checkOrientation);
+    checkOrientation();
+
+    // ---------------------------------------------------------------
+    //  Phaser Game Scene
+    // ---------------------------------------------------------------
+    class GameScene extends Phaser.Scene {
+      constructor() {
+        super('GameScene');
+        this.worldWidth = 2600;
+        this.worldHeight = 1800;
+        this.objective = 0;
+        this.finalPathActive = false;
+        this.revealTriggered = false;
+        this.currentInteractable = null;
+        this.typing = false;
+        this.dialogueLines = [];
+        this.dialogueIndex = 0;
+        this.dialogueCallback = null;
+        this.typewriterTimer = null;
+        this.typewriterCb = null;
+        this.autoLineTimer = null;
+        this.autoAdvance = false;
+      }
+
+      create() {
+        Game.scene = this;
+        this.cameras.main.setRoundPixels(true);
+        this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
+        this.physics.world.gravity.y = 0;
+        this.cameras.main.setBackgroundColor('#8db5d6');
+
+        this.createTextures();
+        this.createWorld();
+        this.createPlayer();
+        this.createNPCsAndObjects();
+        this.createAmbient();
+        this.createInteractionMarker();
+
+        this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
+        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+
+        this.physics.add.collider(this.player, this.trees);
+        this.player.body.setCollideWorldBounds(true);
+
+        // Start hidden/disabled
+        this.setControlsEnabled(false);
+        this.nightOverlay.setVisible(false);
+        this.sunsetOverlay.setVisible(false);
+        this.stars.children.iterate((s) => s.setAlpha(0));
+        this.fireflies.children.iterate((f) => f.setAlpha(0));
+      }
+
+      createTextures() {
+        const av = {
+          Y: '#f4a261', b: '#f7d9aa', E: '#4a2e1b', R: '#e8a0b4', '.': 'rgba(0,0,0,0)'
+        };
+        this.createPixelTexture('avril', [
+          '....YYYY....',
+          '...YYYYYY...',
+          '..YYbbbbYY..',
+          '.YbbbbbbbbY.',
+          '.YbbbbbbbbY.',
+          '.YbEYbbEYbY.',
+          '.YbbbbbbbbY.',
+          '.YbbbbbbbbY.',
+          '..YbbbbbbY..',
+          '...YYYYYY...',
+          '....RRRR....',
+          '...RRRRRR...',
+          '..RRRRRRRR..',
+          '..RRRRRRRR..',
+          '..RRR..RRR..',
+          '...RR..RR...'
+        ], av, 4);
+
+        const mePal = {
+          B: '#3e2a1e', b: '#f0c8a0', E: '#3a2a2a', C: '#6b8ca6', '.': 'rgba(0,0,0,0)'
+        };
+        this.createPixelTexture('me', [
+          '....BBBB....',
+          '...BBBBBB...',
+          '..BBbbbbBB..',
+          '.BBbbbbbbBB.',
+          '.BBbEYbbEbB.',
+          '.BBbbbbbbBB.',
+          '..BBbbbbBB..',
+          '...BBBBBB...',
+          '....CCCC....',
+          '...CCCCCC...',
+          '..CCCCCCCC..',
+          '..CCCCCCCC..',
+          '..CCC..CCC..',
+          '...CC...CC..'
+        ], mePal, 4);
+
+        const npc1Pal = {
+          H: '#d8cfc4', b: '#f0c8a0', E: '#3a2a2a', G: '#7a9b76', '.': 'rgba(0,0,0,0)'
+        };
+        this.createPixelTexture('npc1', [
+          '....HHHH....',
+          '...HHHHHH...',
+          '..HHbbbbHH..',
+          '.HbbEbbEbbH.',
+          '.HbbbbbbbbH.',
+          '.HbbbbbbbbH.',
+          '..HbbbbbbH..',
+          '...HHHHHH...',
+          '....GGGG....',
+          '...GGGGGG...',
+          '..GGGGGGGG..',
+          '..GGGGGGGG..',
+          '..GGG..GGG..',
+          '...GG...GG..'
+        ], npc1Pal, 4);
+
+        const npc2Pal = {
+          G: '#a3c9a8', b: '#f0c8a0', E: '#3a2a2a', O: '#e0a66b', '.': 'rgba(0,0,0,0)'
+        };
+        this.createPixelTexture('npc2', [
+          '....GGGG....',
+          '...GGGGGG...',
+          '..GGbbbbGG..',
+          '.GbbEbbEbbG.',
+          '.GbbbbbbbbG.',
+          '.GbbbbbbbbG.',
+          '..GbbbbbbG..',
+          '...GGGGGG...',
+          '....OOOO....',
+          '...OOOOOO...',
+          '..OOOOOOOO..',
+          '..OOOOOOOO..',
+          '..OOO..OOO..',
+          '...OO...OO..'
+        ], npc2Pal, 4);
+
+        const npc3Pal = {
+          P: '#b79bce', b: '#f0c8a0', E: '#3a2a2a', S: '#6d8bb0', '.': 'rgba(0,0,0,0)'
+        };
+        this.createPixelTexture('npc3', [
+          '....PPPP....',
+          '...PPPPPP...',
+          '..PPbbbbPP..',
+          '.PbbEbbEbbP.',
+          '.PbbbbbbbbP.',
+          '.PbbbbbbbbP.',
+          '..PbbbbbbP..',
+          '...PPPPPP...',
+          '....SSSS....',
+          '...SSSSSS...',
+          '..SSSSSSSS..',
+          '..SSSSSSSS..',
+          '..SSS..SSS..',
+          '...SS...SS..'
+        ], npc3Pal, 4);
+
+        const treePal = { L: '#4f7f4f', T: '#7a5230', '.': 'rgba(0,0,0,0)' };
+        this.createPixelTexture('tree', [
+          '......LLLL......',
+          '.....LLLLLL.....',
+          '....LLLLLLLL....',
+          '...LLLLLLLLLL...',
+          '..LLLLLLLLLLLL..',
+          '..LLLLLLLLLLLL..',
+          '..LLLLLLLLLLLL..',
+          '...LLLLLLLLLL...',
+          '....LLLLLLLL....',
+          '......TTTT......',
+          '......TTTT......',
+          '......TTTT......'
+        ], treePal, 3);
+
+        const orbPal = { Y: '#fff3b0', W: '#ffffff', '.': 'rgba(0,0,0,0)' };
+        this.createPixelTexture('orb', [
+          '...YY...',
+          '..YWWY..',
+          '.YWWWWY.',
+          '.YWWWWY.',
+          '.YWWWWY.',
+          '..YWWY..',
+          '...YY...',
+          '........'
+        ], orbPal, 4);
+
+        const flowerPal = { F: '#f4a6c0', G: '#5a8f5a', '.': 'rgba(0,0,0,0)' };
+        this.createPixelTexture('flower', [
+          '...F....',
+          '..FFF...',
+          '.FFFFF..',
+          '..FFF...',
+          '...G....',
+          '...G....',
+          '..GGG...',
+          '........'
+        ], flowerPal, 4);
+
+        const heartPal = { H: '#ff8fa3', '.': 'rgba(0,0,0,0)' };
+        this.createPixelTexture('heart', [
+          '........',
+          '.HH..HH.',
+          '.HHHHHH.',
+          '.HHHHHH.',
+          '..HHHH..',
+          '...HH...',
+          '........',
+          '........'
+        ], heartPal, 4);
+
+        const fireflyPal = { Y: '#fffbb0', W: '#ffffff', '.': 'rgba(0,0,0,0)' };
+        this.createPixelTexture('firefly', [
+          '.Y..',
+          'YWWY',
+          'YWWY',
+          '.Y..'
+        ], fireflyPal, 3);
+
+        const starPal = { W: '#ffffff', '.': 'rgba(0,0,0,0)' };
+        this.createPixelTexture('star', [
+          '.W',
+          'W.'
+        ], starPal, 3);
+
+        const markerPal = { W: '#ffffff', '.': 'rgba(0,0,0,0)' };
+        this.createPixelTexture('marker', [
+          '.W.',
+          '.W.',
+          '.W.',
+          '.W.',
+          '...',
+          '.W.',
+          '...',
+          '...'
+        ], markerPal, 3);
+      }
+
+      createPixelTexture(key, rows, palette, scale) {
+        const w = rows[0].length;
+        const h = rows.length;
+        const canvas = this.textures.createCanvas(key, w * scale, h * scale);
+        const ctx = canvas.context;
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, w * scale, h * scale);
+        for (let y = 0; y < h; y++) {
+          const row = rows[y];
+          for (let x = 0; x < w; x++) {
+            const c = row[x];
+            if (c === '.' || c === ' ') continue;
+            const color = palette[c] || '#ff00ff';
+            ctx.fillStyle = color;
+            ctx.fillRect(x * scale, y * scale, scale, scale);
+          }
+        }
+        canvas.refresh();
+      }
+
+      createWorld() {
+        // Ground
+        this.groundRect = this.add.rectangle(0, this.worldHeight * 0.4, this.worldWidth, this.worldHeight * 0.6, 0x6a9e6a).setOrigin(0);
+        this.groundRect.setDepth(-10);
+
+        // Path
+        const pathColor = 0xe8d1a7;
+        this.add.rectangle(250, 420, 90, 700, pathColor).setDepth(-9);
+        this.add.rectangle(250, 800, 800, 80, pathColor).setDepth(-9);
+        this.add.rectangle(900, 650, 80, 500, pathColor).setDepth(-9);
+        this.add.rectangle(900, 1100, 800, 80, pathColor).setDepth(-9);
+        this.add.rectangle(1700, 500, 80, 700, pathColor).setDepth(-9);
+        this.add.rectangle(1700, 800, 800, 80, pathColor).setDepth(-9);
+
+        // Pond
+        this.add.ellipse(1300, 1150, 180, 120, 0x5b8db0).setDepth(-8);
+        this.ripple = this.add.ellipse(1300, 1150, 180, 120, 0xffffff, 0.08).setDepth(-8);
+        this.tweens.add({
+          targets: this.ripple,
+          scaleX: 1.08,
+          scaleY: 1.08,
+          alpha: 0,
+          duration: 2400,
+          repeat: -1,
+          yoyo: true,
+          ease: 'Sine.easeOut'
+        });
+
+        // Trees
+        this.trees = this.physics.add.staticGroup();
+        [
+          [250, 320],
+          [700, 800],
+          [1300, 1000],
+          [1800, 500],
+          [2400, 700],
+          [400, 1200],
+          [2000, 1200]
+        ].forEach(([x, y]) => {
+          const tree = this.trees.create(x, y, 'tree');
+          tree.setDepth(5);
+          tree.body.setSize(40, 40);
+          tree.body.setOffset(-14, -12);
+        });
+
+        // Night overlay, used later
+        this.nightOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0x0a1030, 0.55);
+        this.nightOverlay.setDepth(-1);
+        this.nightOverlay.setVisible(false);
+
+        // Sunset overlay, used later
+        this.sunsetOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0xffb347, 0.22);
+        this.sunsetOverlay.setDepth(-1);
+        this.sunsetOverlay.setVisible(false);
+      }
+
+      createPlayer() {
+        this.player = this.physics.add.sprite(250, 450, 'avril');
+        this.player.setDepth(10);
+        this.player.body.setSize(24, 24, true);
+        this.player.body.setOffset(-4, -6);
+        this.player.setCollideWorldBounds(true);
+        this.tweens.add({
+          targets: this.player,
+          y: this.player.y - 2,
+          duration: 900,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+
+      createNPCsAndObjects() {
+        this.npc1 = this.physics.add.sprite(850, 650, 'npc1');
+        this.npc1.setDepth(10);
+        this.npc1.id = 'npc1';
+        this.npc1.label = 'Talk';
+        this.npc1.body.setSize(24, 24, true);
+        this.npc1.body.setOffset(-4, -6);
+
+        this.npc2 = this.physics.add.sprite(1350, 1100, 'npc2');
+        this.npc2.setDepth(10);
+        this.npc2.id = 'npc2';
+        this.npc2.label = 'Talk';
+        this.npc2.body.setSize(24, 24, true);
+        this.npc2.body.setOffset(-4, -6);
+
+        this.npc3 = this.physics.add.sprite(1750, 500, 'npc3');
+        this.npc3.setDepth(10);
+        this.npc3.id = 'npc3';
+        this.npc3.label = 'Talk';
+        this.npc3.body.setSize(24, 24, true);
+        this.npc3.body.setOffset(-4, -6);
+
+        this.playerMe = this.physics.add.sprite(2400, 800, 'me');
+        this.playerMe.setDepth(10);
+        this.playerMe.setVisible(false);
+        this.playerMe.body.setSize(24, 24, true);
+        this.playerMe.body.setOffset(-4, -6);
+
+        // Clue object
+        this.clue1 = this.physics.add.sprite(900, 680, 'orb');
+        this.clue1.setDepth(10);
+        this.clue1.id = 'clue1';
+        this.clue1.label = 'Examine';
+        this.clue1.setVisible(false);
+        this.clue1.body.setSize(20, 20, true);
+
+        // Memory object
+        this.memoryObject = this.physics.add.sprite(2100, 1000, 'flower');
+        this.memoryObject.setDepth(10);
+        this.memoryObject.id = 'memory';
+        this.memoryObject.label = 'Look';
+        this.memoryObject.setVisible(false);
+        this.memoryObject.body.setSize(20, 20, true);
+      }
+
+      createAmbient() {
+        this.stars = this.add.group();
+        for (let i = 0; i < 50; i++) {
+          const x = Phaser.Math.Between(0, this.worldWidth);
+          const y = Phaser.Math.Between(0, this.worldHeight * 0.4);
+          const star = this.add.image(x, y, 'star');
+          star.setDepth(6);
+          star.setAlpha(0);
+          star.setScale(Phaser.Math.FloatBetween(0.3, 0.8));
+          this.stars.add(star);
+          this.tweens.add({
+            targets: star,
+            alpha: 0.8,
+            duration: Phaser.Math.Between(900, 1800),
+            repeat: -1,
+            yoyo: true,
+            delay: Phaser.Math.Between(0, 1200)
+          });
+        }
+
+        this.fireflies = this.add.group();
+        for (let i = 0; i < 28; i++) {
+          const x = Phaser.Math.Between(0, this.worldWidth);
+          const y = Phaser.Math.Between(this.worldHeight * 0.4, this.worldHeight);
+          const f = this.add.image(x, y, 'firefly');
+          f.setDepth(20);
+          f.setAlpha(0);
+          f.setScale(Phaser.Math.FloatBetween(0.5, 1));
+          this.fireflies.add(f);
+          this.tweens.add({
+            targets: f,
+            alpha: 0.9,
+            duration: Phaser.Math.Between(800, 1600),
+            repeat: -1,
+            yoyo: true,
+            delay: Phaser.Math.Between(0, 1000)
+          });
+          this.tweens.add({
+            targets: f,
+            x: x + Phaser.Math.Between(-45, 45),
+            y: y + Phaser.Math.Between(-45, 45),
+            duration: Phaser.Math.Between(3000, 6500),
+            repeat: -1,
+            yoyo: true,
+            ease: 'Sine.easeInOut'
+          });
+        }
+      }
+
+      createInteractionMarker() {
+        this.marker = this.add.image(0, 0, 'marker');
+        this.marker.setDepth(25);
+        this.marker.setVisible(false);
+        this.tweens.add({
+          targets: this.marker,
+          y: -4,
+          duration: 500,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+
+      setControlsEnabled(enabled) {
+        Game.controlsEnabled = enabled;
+        if (enabled) {
+          joystickZone.classList.remove('disabled');
+          interactBtn.classList.remove('disabled');
+        } else {
+          joystickZone.classList.add('disabled');
+          interactBtn.classList.add('disabled');
+        }
+      }
+
+      setInteractButton(active, label) {
+        if (active) {
+          interactBtn.classList.add('active');
+          interactBtn.textContent = label || '💬';
+        } else {
+          interactBtn.classList.remove('active');
+          interactBtn.textContent = '💬';
+        }
+      }
+
+      // ---------------------------------------------------------
+      //  Opening sequence
+      // ---------------------------------------------------------
+      startOpening() {
+        Game.inCinematic = true;
+        this.setControlsEnabled(false);
+        this.cameras.main.fadeIn(2200, 0, 0, 0);
+        this.cameras.main.centerOn(250, 380);
+        this.player.setPosition(250, 450);
+
+        this.time.delayedCall(2600, () => {
+          const openingLines = [
+            { speaker: AVRIL_NAME, text: 'Where am I...?' },
+            { speaker: AVRIL_NAME, text: 'Wait...' },
+            { speaker: AVRIL_NAME, text: 'Where are you?' },
+            { speaker: AVRIL_NAME, text: "You're not here..." },
+            { speaker: '', text: 'Find him.' }
+          ];
+          this.showDialogue(openingLines, () => {
+            this.showCenteredText('FIND ME', 2600, () => {
+              Game.audio.setMood('day');
+              Game.inCinematic = false;
+              this.setControlsEnabled(true);
+              this.objective = 0;
+            });
+          }, { autoAdvance: true, lineDelay: 1900 });
+        });
+      }
+
+      // ---------------------------------------------------------
+      //  Dialogue system
+      // ---------------------------------------------------------
+      showDialogue(lines, callback, opts = {}) {
+        if (this.dialogueActive) return;
+        this.dialogueLines = lines;
+        this.dialogueIndex = 0;
+        this.dialogueCallback = callback || null;
+        this.autoAdvance = !!opts.autoAdvance;
+        this.autoLineTimer = null;
+        Game.dialogueActive = true;
+        this.setControlsEnabled(false);
+        this.player.body.setVelocity(0);
+
+        dialogueOverlay.classList.add('active');
+        interactBtn.classList.add('dialogue-mode');
+        this.showLine(0);
+      }
+
+      showLine(index) {
+        if (index < 0 || index >= this.dialogueLines.length) {
+          this.endDialogue();
+          return;
+        }
+
+        this.dialogueIndex = index;
+        const line = this.dialogueLines[index];
+        dialogueSpeaker.textContent = line.speaker || '';
+        dialogueSpeaker.style.display = line.speaker ? 'block' : 'none';
+
+        this.typewriterText(line.text, dialogueText, () => {
+          if (this.autoAdvance) {
+            const delay = line.pauseAfter || 1800;
+            this.autoLineTimer = this.time.delayedCall(delay, () => this.nextLine());
+          }
+        });
+      }
+
+      typewriterText(text, el, cb) {
+        this.typing = true;
+        this.typewriterCb = cb || null;
+        el.textContent = '';
+        let i = 0;
+        const step = () => {
+          if (i < text.length) {
+            el.textContent += text.charAt(i);
+            i++;
+            this.typewriterTimer = setTimeout(step, 24);
+          } else {
+            this.typing = false;
+            const done = this.typewriterCb;
+            this.typewriterCb = null;
+            done && done();
+          }
+        };
+        step();
+      }
+
+      completeTyping() {
+        if (!this.typing) return;
+        clearTimeout(this.typewriterTimer);
+        const line = this.dialogueLines[this.dialogueIndex];
+        dialogueText.textContent = line.text;
+        this.typing = false;
+        const cb = this.typewriterCb;
+        this.typewriterCb = null;
+        cb && cb();
+      }
+
+      advanceDialogue() {
+        if (!Game.dialogueActive) return;
+
+        if (this.typing) {
+          Game.audio.playSFX('interact');
+          this.completeTyping();
+          return;
+        }
+
+        if (this.autoLineTimer) {
+          this.autoLineTimer.remove();
+          this.autoLineTimer = null;
+        }
+
+        Game.audio.playSFX('interact');
+        this.nextLine();
+      }
+
+      nextLine() {
+        if (this.typing) return;
+        this.dialogueIndex++;
+        if (this.dialogueIndex < this.dialogueLines.length) {
+          this.showLine(this.dialogueIndex);
+        } else {
+          this.endDialogue();
+        }
+      }
+
+      endDialogue() {
+        dialogueOverlay.classList.remove('active');
+        interactBtn.classList.remove('dialogue-mode');
+        Game.dialogueActive = false;
+        this.dialogueLines = [];
+        this.dialogueIndex = 0;
+        this.setControlsEnabled(!Game.inCinematic);
+        this.player.body.setVelocity(0);
+        const cb = this.dialogueCallback;
+        this.dialogueCallback = null;
+        cb && cb();
+      }
+
+      // ---------------------------------------------------------
+      //  Centered text helper
+      // ---------------------------------------------------------
+      showCenteredText(text, duration, callback) {
+        finalTextOverlay.classList.add('active');
+        finalText.textContent = text;
+        finalText.style.opacity = 1;
+        this.time.delayedCall(duration, () => {
+          finalTextOverlay.classList.remove('active');
+          callback && callback();
+        });
+      }
+
+      showTextSequence(lines, callback) {
+        let idx = 0;
+        finalTextOverlay.classList.add('active');
+        finalText.style.opacity = 1;
+        const showNext = () => {
+          if (idx >= lines.length) {
+            finalTextOverlay.classList.remove('active');
+            callback && callback();
+            return;
+          }
+          finalText.textContent = lines[idx];
+          finalText.style.opacity = 0;
+          requestAnimationFrame(() => { finalText.style.opacity = 1; });
+          idx++;
+          this.time.delayedCall(2300, () => {
+            finalText.style.opacity = 0;
+            this.time.delayedCall(500, showNext);
+          });
+        };
+        showNext();
+      }
+
+      // ---------------------------------------------------------
+      //  Interaction system
+      // ---------------------------------------------------------
+      getActiveInteractables() {
+        const list = [];
+        if (this.npc1 && this.npc1.active && this.objective === 0) list.push(this.npc1);
+        if (this.npc2 && this.npc2.active && this.objective === 2) list.push(this.npc2);
+        if (this.npc3 && this.npc3.active && this.objective === 3) list.push(this.npc3);
+        if (this.clue1 && this.clue1.active && this.clue1.visible && this.objective === 1) list.push(this.clue1);
+        if (this.memoryObject && this.memoryObject.active && this.memoryObject.visible && this.objective === 4) list.push(this.memoryObject);
+        return list;
+      }
+
+      updateInteractionMarker() {
+        if (Game.dialogueActive || !Game.controlsEnabled || Game.inCinematic) {
+          this.marker.setVisible(false);
+          this.setInteractButton(false);
+          this.currentInteractable = null;
+          return;
+        }
+
+        const player = this.player;
+        let closest = null;
+        let minDist = 130;
+        for (const ent of this.getActiveInteractables()) {
+          if (!ent || !ent.active) continue;
+          const d = Phaser.Math.Distance.Between(player.x, player.y, ent.x, ent.y);
+          if (d < minDist) {
+            minDist = d;
+            closest = ent;
+          }
+        }
+
+        this.currentInteractable = closest;
+        if (closest) {
+          this.marker.setVisible(true);
+          this.marker.setPosition(closest.x, closest.y - 32);
+          this.setInteractButton(true, closest.label || 'Talk');
+        } else {
+          this.marker.setVisible(false);
+          this.setInteractButton(false);
+        }
+      }
+
+      handleInteract() {
+        if (Game.dialogueActive) {
+          this.advanceDialogue();
+          return;
+        }
+        if (!Game.controlsEnabled || Game.inCinematic) return;
+        const ent = this.currentInteractable;
+        if (!ent || !ent.active) return;
+
+        Game.audio.playSFX('interact');
+
+        if (ent.id === 'npc1') this.triggerNPC1();
+        else if (ent.id === 'npc2') this.triggerNPC2();
+        else if (ent.id === 'npc3') this.triggerNPC3();
+        else if (ent.id === 'clue1') this.triggerClue1();
+        else if (ent.id === 'memory') this.triggerMemory();
+      }
+
+      triggerNPC1() {
+        const lines = [
+          { speaker: 'NPC', text: "You're looking for someone, aren't you?" },
+          { speaker: AVRIL_NAME, text: 'Yes...' },
+          { speaker: 'NPC', text: "Then you're going the right way." },
+          { speaker: AVRIL_NAME, text: 'You know where he is?' },
+          { speaker: 'NPC', text: 'Not exactly.' },
+          { speaker: 'NPC', text: 'But he left something for you.' }
+        ];
+        this.showDialogue(lines, () => {
+          this.objective = 1;
+          this.clue1.setVisible(true);
+          this.clue1.active = true;
+          Game.audio.playSFX('clue');
+          this.setControlsEnabled(true);
+        });
+      }
+
+      triggerClue1() {
+        Game.audio.playSFX('clue');
+        const lines = [
+          { speaker: '', text: "If you're reading this, you're already getting closer." },
+          { speaker: '', text: 'Keep going.' }
+        ];
+        this.showDialogue(lines, () => {
+          this.objective = 2;
+          this.clue1.destroy();
+          this.clue1 = null;
+          this.setControlsEnabled(true);
+        });
+      }
+
+      triggerNPC2() {
+        const lines = [
+          { speaker: 'NPC', text: 'He talked about you a lot.' },
+          { speaker: AVRIL_NAME, text: 'He did?' },
+          { speaker: 'NPC', text: "He said there's one thing he never gets tired of." },
+          { speaker: AVRIL_NAME, text: 'What?' },
+          { speaker: 'NPC', text: 'Hearing your voice.' },
+          { speaker: '', text: '...' },
+          { speaker: 'NPC', text: 'He always said it made even ordinary days feel special.' },
+          { speaker: '', text: 'I could listen to you talk forever.' }
+        ];
+        this.showDialogue(lines, () => {
+          this.objective = 3;
+          this.triggerNightTransition();
+        });
+      }
+
+      triggerNightTransition() {
+        this.setControlsEnabled(false);
+        Game.inCinematic = true;
+        this.cameras.main.fadeOut(1000, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          Game.audio.setMood('night');
+          this.nightOverlay.setVisible(true);
+          this.cameras.main.setBackgroundColor('#0a1030');
+          this.stars.children.iterate((s) => s.setAlpha(0.8));
+          this.fireflies.children.iterate((f) => f.setAlpha(0.8));
+          this.cameras.main.fadeIn(1400, 0, 0, 0);
+          this.cameras.main.once('camerafadeincomplete', () => {
+            Game.inCinematic = false;
+            this.setControlsEnabled(true);
+          });
+        });
+      }
+
+      triggerNPC3() {
+        const lines = [
+          { speaker: 'NPC', text: 'He always waits here.' },
+          { speaker: AVRIL_NAME, text: 'For me?' },
+          { speaker: 'NPC', text: 'Maybe.' },
+          { speaker: '', text: '...' },
+          { speaker: 'NPC', text: 'He told me something once.' },
+          { speaker: AVRIL_NAME, text: 'What?' },
+          { speaker: 'NPC', text: 'He always waits under the stars.' },
+          { speaker: '', text: "Maybe someday we'll look at the same sky together." }
+        ];
+        this.showDialogue(lines, () => {
+          this.objective = 4;
+          this.memoryObject.setVisible(true);
+          this.memoryObject.active = true;
+          this.setControlsEnabled(true);
+        });
+      }
+
+      triggerMemory() {
+        Game.audio.playSFX('memory');
+        this.setControlsEnabled(false);
+        Game.inCinematic = true;
+        this.cameras.main.fadeOut(500, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          Game.audio.setMood('memory');
+          this.memoryObject.destroy();
+          this.memoryObject = null;
+          memoryOverlay.classList.add('active');
+          this.cycleMemoryLines([
+            'Talking',
+            'Laughing',
+            'Waiting for messages',
+            'Looking at the phone',
+            'Watching the night sky'
+          ], () => {
+            memoryOverlay.classList.remove('active');
+            this.cameras.main.fadeIn(500, 0, 0, 0);
+            this.cameras.main.once('camerafadeincomplete', () => {
+              const lines = [
+                { speaker: '', text: 'Distance gave us a lot of reasons to miss each other.' },
+                { speaker: '', text: 'But it never gave me a reason to stop choosing you.' }
+              ];
+              this.showDialogue(lines, () => {
+                this.objective = 5;
+                this.startFinalPath();
+              });
+            });
+          });
+        });
+      }
+
+      cycleMemoryLines(lines, callback) {
+        let idx = 0;
+        memoryText.style.transition = 'opacity 0.6s ease';
+        const show = (i) => {
+          if (i >= lines.length) {
+            callback && callback();
+            return;
+          }
+          memoryText.textContent = lines[i];
+          memoryText.style.opacity = 0;
+          requestAnimationFrame(() => { memoryText.style.opacity = 1; });
+          this.time.delayedCall(1700, () => {
+            memoryText.style.opacity = 0;
+            this.time.delayedCall(500, () => show(i + 1));
+          });
+        };
+        show(0);
+      }
+
+      startFinalPath() {
+        this.setControlsEnabled(false);
+        Game.inCinematic = true;
+        Game.audio.setMood('final');
+
+        // Clean up remaining NPCs
+        if (this.npc1) this.npc1.destroy();
+        if (this.npc2) this.npc2.destroy();
+        if (this.npc3) this.npc3.destroy();
+        this.nightOverlay.setVisible(false);
+        this.sunsetOverlay.setVisible(true);
+        this.cameras.main.setBackgroundColor('#e89a6a');
+
+        this.showCenteredText('Follow the path...', 1600, () => {
+          Game.inCinematic = false;
+          this.setControlsEnabled(true);
+          this.finalPathActive = true;
+        });
+      }
+
+      checkFinalPath() {
+        if (this.finalPathActive && !this.revealTriggered && this.player.x > 2200) {
+          this.revealTriggered = true;
+          this.startReveal();
+        }
+      }
+
+      startReveal() {
+        this.finalPathActive = false;
+        this.setControlsEnabled(false);
+        Game.inCinematic = true;
+        joystickZone.classList.add('fade-out');
+        interactBtn.classList.add('fade-out');
+        this.player.body.setVelocity(0);
+        this.playerMe.setVisible(true);
+        this.playerMe.setPosition(2450, 800);
+        this.player.setPosition(2200, 800);
+        this.cameras.main.pan(2400, 800, 1600, 'Sine.easeInOut');
+        this.time.delayedCall(1600, () => {
+          const lines = [
+            { speaker: MY_NAME, text: "I've been waiting for you." },
+            { speaker: AVRIL_NAME, text: 'I found you.' },
+            { speaker: MY_NAME, text: 'You did.' },
+            { speaker: '', text: '...' },
+            { speaker: MY_NAME, text: 'I knew you would.' }
+          ];
+          this.showDialogue(lines, () => this.startHug());
+        });
+      }
+
+      startHug() {
+        this.setControlsEnabled(false);
+        Game.audio.setMood('final');
+
+        this.tweens.add({
+          targets: this.player,
+          x: 2300,
+          duration: 1200,
+          ease: 'Sine.easeInOut'
+        });
+        this.tweens.add({
+          targets: this.playerMe,
+          x: 2280,
+          duration: 1200,
+          ease: 'Sine.easeInOut'
+        });
+
+        this.time.delayedCall(1300, () => this.spawnHearts());
+        this.time.delayedCall(4800, () => this.showLetter());
+      }
+
+      spawnHearts() {
+        for (let i = 0; i < 10; i++) {
+          const x = Phaser.Math.Between(2220, 2380);
+          const y = Phaser.Math.Between(700, 850);
+          const heart = this.add.image(x, y, 'heart').setDepth(20);
+          heart.setScale(0.5);
+          heart.setAlpha(0.95);
+          this.tweens.add({
+            targets: heart,
+            y: y - Phaser.Math.Between(30, 65),
+            x: x + Phaser.Math.Between(-15, 15),
+            alpha: 0,
+            scale: 1,
+            duration: Phaser.Math.Between(1000, 1900),
+            ease: 'Sine.easeOut',
+            onComplete: () => heart.destroy()
+          });
+        }
+      }
+
+      showLetter() {
+        Game.inCinematic = true;
+        this.cameras.main.fadeOut(1000, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          Game.audio.setMood('letter');
+          letterOverlay.classList.add('active');
+          startLetterTypewriter();
+        });
+      }
+
+      showFinalScene() {
+        Game.inCinematic = true;
+        Game.audio.setMood('ending');
+        this.sunsetOverlay.setVisible(true);
+        this.cameras.main.setBackgroundColor('#e89a6a');
+        this.cameras.main.centerOn(280, 380);
+
+        this.player.setPosition(260, 380);
+        this.playerMe.setPosition(310, 380);
+        this.playerMe.setVisible(true);
+        this.player.setVisible(true);
+        this.player.setFlipX(false);
+        this.playerMe.setFlipX(true);
+
+        this.fireflies.children.iterate((f) => f.setAlpha(0.85));
+        this.stars.children.iterate((s) => s.setAlpha(0.6));
+
+        this.cameras.main.fadeIn(900, 0, 0, 0);
+        this.cameras.main.once('camerafadeincomplete', () => {
+          const lines = [
+            'You found me.',
+            "And I'd find you again.",
+            ANNIVERSARY_TEXT,
+            "Our story isn't over yet."
+          ];
+          this.showTextSequence(lines, () => {
+            this.cameras.main.fadeOut(1600, 0, 0, 0);
+            this.cameras.main.once('camerafadeoutcomplete', () => {
+              endOverlay.classList.add('active');
+            });
+          });
+        });
+      }
+
+      update() {
+        // Movement
+        if (Game.controlsEnabled && !Game.dialogueActive && !Game.inCinematic) {
+          const v = Game.inputVector;
+          if (v.x !== 0 || v.y !== 0) {
+            this.player.body.setVelocity(v.x * 180, v.y * 180);
+            if (v.x < 0) this.player.setFlipX(true);
+            else if (v.x > 0) this.player.setFlipX(false);
+          } else {
+            this.player.body.setVelocity(0);
+          }
+        } else if (this.player.body) {
+          this.player.body.setVelocity(0);
+        }
+
+        this.updateInteractionMarker();
+        this.checkFinalPath();
+      }
+    }
+
+    // ---------------------------------------------------------------
+    //  Letter typewriter
+    // ---------------------------------------------------------------
+    const FULL_LETTER = LETTER_PARAGRAPHS.join('\n\n');
+    let letterTyping = false;
+    let letterTimer = null;
+    let letterIndex = 0;
+
+    function startLetterTypewriter() {
+      letterText.textContent = '';
+      letterBtn.style.display = 'none';
+      letterTyping = true;
+      letterIndex = 0;
+      letterTimer = setInterval(() => {
+        if (letterIndex < FULL_LETTER.length) {
+          letterText.textContent += FULL_LETTER.charAt(letterIndex);
+          letterIndex++;
+        } else {
+          clearInterval(letterTimer);
+          letterTyping = false;
+          letterBtn.style.display = 'block';
+        }
+      }, 32);
+    }
+
+    function skipLetterTyping() {
+      if (!letterTyping) return;
+      clearInterval(letterTimer);
+      letterText.textContent = FULL_LETTER;
+      letterTyping = false;
+      letterBtn.style.display = 'block';
+    }
+
+    // ---------------------------------------------------------------
+    //  Phaser config & boot
+    // ---------------------------------------------------------------
+    window.addEventListener('load', () => {
+      const config = {
+        type: Phaser.AUTO,
+        parent: 'game-container',
+        backgroundColor: '#8db5d6',
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelArt: true,
+        roundPixels: true,
+        physics: {
+          default: 'arcade',
+          arcade: {
+            gravity: { y: 0 },
+            debug: false
+          }
+        },
+        scale: {
+          mode: Phaser.Scale.RESIZE,
+          autoCenter: Phaser.Scale.CENTER_BOTH,
+          width: '100%',
+          height: '100%'
+        },
+        scene: [GameScene]
+      };
+
+      new Phaser.Game(config);
+    });
+
+    // Make initial joystick disabled state visible
+    joystickZone.classList.add('disabled');
+  </script>
+</body>
+</html>
