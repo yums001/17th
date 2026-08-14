@@ -1,1867 +1,2399 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Find Me — A Gift for Avril</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
-    :root {
-      --safe-top: env(safe-area-inset-top, 0px);
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-      --safe-left: env(safe-area-inset-left, 0px);
-      --safe-right: env(safe-area-inset-right, 0px);
-      --ui-pad: 12px;
-      --btn-size: 72px;
-      --joystick-size: 120px;
-      --warm-bg: #f9e7d2;
-      --warm-text: #4a2e1b;
-      --pixel-font: 'Press Start 2P', 'Courier New', monospace;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      font-family: var(--pixel-font);
-      touch-action: none;
-      overscroll-behavior: none;
-      -webkit-user-select: none;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    #game-container {
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-    }
-
-    #game-container canvas {
-      display: block;
-      pointer-events: none;
-    }
-
-    #ui-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 10;
-      pointer-events: none;
-      color: #fff;
-    }
-
-    /* ---------- Start overlay ---------- */
-    #start-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 30;
-      pointer-events: auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      background: radial-gradient(circle at 50% 30%, #1b2a3a 0%, #070b10 100%);
-      padding: 20px;
-      transition: opacity 0.8s ease;
-    }
-
-    #start-overlay.hidden { opacity: 0; pointer-events: none; }
-
-    #start-overlay h1 {
-      font-size: clamp(26px, 8vw, 52px);
-      letter-spacing: 6px;
-      color: #ffe8c2;
-      text-shadow: 0 0 18px rgba(255, 200, 120, 0.6);
-      margin-bottom: 20px;
-    }
-
-    #start-overlay p {
-      font-size: 12px;
-      color: #d8cbb6;
-      margin-bottom: 30px;
-      line-height: 1.8;
-    }
-
-    #start-btn {
-      pointer-events: auto;
-      min-width: 190px;
-      min-height: 54px;
-      background: #e8a0b4;
-      border: 3px solid #ffe8c2;
-      border-radius: 999px;
-      color: #3a1a1a;
-      font-family: var(--pixel-font);
-      font-size: 14px;
-      letter-spacing: 2px;
-      padding: 0 24px;
-      cursor: pointer;
-      box-shadow: 0 0 25px rgba(232, 160, 180, 0.45);
-      transition: transform 0.15s, box-shadow 0.15s;
-    }
-
-    #start-btn:active { transform: scale(0.96); box-shadow: 0 0 12px rgba(232, 160, 180, 0.25); }
-
-    /* ---------- Orientation overlay ---------- */
-    #rotate-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 40;
-      background: #0b1018;
-      color: #ffe8c2;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 40px;
-      pointer-events: auto;
-      font-size: 14px;
-      line-height: 1.8;
-    }
-
-    #rotate-overlay.active { display: flex; }
-
-    /* ---------- Mute button ---------- */
-    #mute-btn {
-      position: absolute;
-      top: calc(var(--safe-top) + 10px);
-      right: calc(var(--safe-right) + 10px);
-      width: 48px;
-      height: 48px;
-      min-width: 48px;
-      min-height: 48px;
-      pointer-events: auto;
-      border-radius: 50%;
-      border: 2px solid rgba(255, 232, 194, 0.6);
-      background: rgba(0, 0, 0, 0.35);
-      color: #ffe8c2;
-      font-size: 22px;
-      cursor: pointer;
-      z-index: 25;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-    }
-
-    #mute-btn:active { background: rgba(255, 232, 194, 0.2); }
-
-    /* ---------- Joystick ---------- */
-    #joystick-zone {
-      position: absolute;
-      left: calc(var(--safe-left) + 16px);
-      bottom: calc(var(--safe-bottom) + 24px);
-      width: var(--joystick-size);
-      height: var(--joystick-size);
-      pointer-events: auto;
-      z-index: 22;
-      transition: opacity 0.6s;
-    }
-
-    #joystick-zone.disabled { opacity: 0.35; pointer-events: none; }
-    #joystick-zone.fade-out { opacity: 0; pointer-events: none; }
-
-    #joystick-base {
-      position: absolute;
-      inset: 50% 50% 50% 50%;
-      width: calc(var(--joystick-size) - 20px);
-      height: calc(var(--joystick-size) - 20px);
-      margin: calc((var(--joystick-size) - 20px) / -2) 0 0 calc((var(--joystick-size) - 20px) / -2);
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.08);
-      border: 2px solid rgba(255, 255, 255, 0.25);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    #joystick-thumb {
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      background: rgba(255, 232, 194, 0.7);
-      border: 2px solid rgba(255, 255, 255, 0.8);
-      box-shadow: 0 0 12px rgba(255, 200, 120, 0.4);
-      transform: translate(0, 0);
-      transition: transform 0.03s linear;
-      pointer-events: none;
-    }
-
-    /* ---------- Interact button ---------- */
-    #interact-btn {
-      position: absolute;
-      right: calc(var(--safe-right) + 16px);
-      bottom: calc(var(--safe-bottom) + 34px);
-      width: var(--btn-size);
-      height: var(--btn-size);
-      min-width: 64px;
-      min-height: 64px;
-      pointer-events: auto;
-      border-radius: 50%;
-      background: rgba(20, 20, 30, 0.55);
-      border: 2px solid rgba(255, 232, 194, 0.65);
-      color: #ffe8c2;
-      font-size: 13px;
-      font-family: var(--pixel-font);
-      cursor: pointer;
-      z-index: 22;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      transition: opacity 0.4s, transform 0.15s, background 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      line-height: 1.4;
-      padding: 8px;
-    }
-
-    #interact-btn.active {
-      background: rgba(232, 160, 180, 0.35);
-      border-color: #ffe8c2;
-      box-shadow: 0 0 18px rgba(255, 200, 160, 0.45);
-    }
-
-    #interact-btn.dialogue-mode {
-      background: rgba(255, 232, 194, 0.18);
-      border-color: #fff;
-    }
-
-    #interact-btn:active { transform: scale(0.92); }
-    #interact-btn.fade-out { opacity: 0; pointer-events: none; }
-
-    /* ---------- Dialogue overlay ---------- */
-    #dialogue-overlay {
-      position: absolute;
-      left: 50%;
-      bottom: calc(var(--safe-bottom) + 16px);
-      transform: translateX(-50%);
-      width: min(92vw, 720px);
-      pointer-events: auto;
-      background: rgba(15, 15, 25, 0.78);
-      border: 2px solid rgba(255, 232, 194, 0.5);
-      border-radius: 18px;
-      padding: 14px 16px;
-      z-index: 24;
-      color: #fff3e0;
-      display: none;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-    }
-
-    #dialogue-overlay.active { display: block; }
-
-    #dialogue-speaker {
-      font-size: 11px;
-      color: #ffd9a0;
-      letter-spacing: 2px;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-    }
-
-    #dialogue-text {
-      font-size: 14px;
-      line-height: 1.7;
-      min-height: 48px;
-      color: #fff3e0;
-      white-space: pre-wrap;
-    }
-
-    /* ---------- Memory overlay ---------- */
-    #memory-overlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: auto;
-      background: linear-gradient(135deg, #f6d9b2 0%, #f2c6a8 45%, #e7b89a 100%);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 28;
-      text-align: center;
-      padding: 30px;
-    }
-
-    #memory-overlay.active { display: flex; }
-
-    #memory-text {
-      font-size: clamp(16px, 4.5vw, 26px);
-      color: #4a2e1b;
-      line-height: 1.8;
-      text-shadow: 0 2px 10px rgba(255, 255, 255, 0.35);
-      opacity: 0;
-      transition: opacity 0.6s ease;
-      max-width: 90vw;
-    }
-
-    /* ---------- Letter overlay ---------- */
-    #letter-overlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: auto;
-      background: var(--warm-bg);
-      color: var(--warm-text);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 29;
-      padding: 20px;
-    }
-
-    #letter-overlay.active { display: flex; }
-
-    #letter-box {
-      width: min(92vw, 640px);
-      max-height: 80vh;
-      overflow-y: auto;
-      background: rgba(255, 250, 240, 0.65);
-      border: 3px solid #d8b99a;
-      border-radius: 18px;
-      padding: 24px 20px;
-      box-shadow: 0 10px 40px rgba(80, 40, 10, 0.15);
-      text-align: left;
-    }
-
-    #letter-text {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: clamp(14px, 3.8vw, 18px);
-      line-height: 1.9;
-      color: #4a2e1b;
-      white-space: pre-wrap;
-      min-height: 180px;
-    }
-
-    #letter-btn {
-      display: none;
-      margin-top: 22px;
-      min-width: 160px;
-      min-height: 52px;
-      background: #e8a0b4;
-      border: 3px solid #fff0e0;
-      border-radius: 999px;
-      color: #3a1a1a;
-      font-family: var(--pixel-font);
-      font-size: 12px;
-      padding: 0 18px;
-      cursor: pointer;
-      box-shadow: 0 0 20px rgba(232, 160, 180, 0.35);
-    }
-
-    #letter-btn:active { transform: scale(0.96); }
-
-    /* ---------- Centered text overlay ---------- */
-    #final-text-overlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 26;
-      background: rgba(0, 0, 0, 0.25);
-      padding: 30px;
-      text-align: center;
-    }
-
-    #final-text-overlay.active { display: flex; }
-
-    #final-text {
-      font-size: clamp(18px, 5.5vw, 32px);
-      color: #fff3e0;
-      text-shadow: 0 0 20px rgba(255, 220, 160, 0.65);
-      line-height: 1.8;
-      letter-spacing: 2px;
-      opacity: 1;
-      transition: opacity 0.5s ease;
-    }
-
-    /* ---------- End overlay ---------- */
-    #end-overlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: auto;
-      background: radial-gradient(circle at 50% 35%, #1b2a3a 0%, #070b10 100%);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      text-align: center;
-      padding: 20px;
-      z-index: 31;
-    }
-
-    #end-overlay.active { display: flex; }
-
-    #end-overlay h1 {
-      font-size: clamp(24px, 7vw, 44px);
-      letter-spacing: 5px;
-      color: #ffe8c2;
-      margin-bottom: 16px;
-      text-shadow: 0 0 18px rgba(255, 200, 120, 0.6);
-    }
-
-    #end-overlay p {
-      font-size: 12px;
-      color: #d8cbb6;
-      margin-bottom: 30px;
-      line-height: 1.8;
-    }
-
-    #play-again-btn {
-      min-width: 160px;
-      min-height: 52px;
-      background: #e8a0b4;
-      border: 3px solid #ffe8c2;
-      border-radius: 999px;
-      color: #3a1a1a;
-      font-family: var(--pixel-font);
-      font-size: 13px;
-      padding: 0 18px;
-      cursor: pointer;
-    }
-
-    #play-again-btn:active { transform: scale(0.96); }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>If We Could Meet</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Georgia', 'Times New Roman', serif;
+        }
+        #game-container {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 0 60px rgba(255, 180, 100, 0.3), 0 0 120px rgba(255, 140, 60, 0.15);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+    </style>
 </head>
 <body>
-  <div id="game-container"></div>
+    <div id="game-container"></div>
 
-  <div id="ui-overlay">
-    <div id="rotate-overlay">
-      <div>🌙 Please rotate your phone back to portrait for the best experience.</div>
-    </div>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js">
+    </script>
+    <script>
+        // ──────────────────────────────────────────────
+        //  MUSIC MANAGER – Simple procedural ambient tones
+        // ──────────────────────────────────────────────
+        class MusicManager {
+            constructor() {
+                this.ctx = null;
+                this.gainNode = null;
+                this.activeOscillators = [];
+                this.isPlaying = false;
+                this.currentMood = 'warm';
+                this.volume = 0.25;
+                this.init();
+            }
 
-    <button id="mute-btn" aria-label="Mute or unmute">🔊</button>
+            init() {
+                try {
+                    this.ctx = new(window.AudioContext || window.webkitAudioContext)();
+                    this.gainNode = this.ctx.createGain();
+                    this.gainNode.gain.value = this.volume;
+                    this.gainNode.connect(this.ctx.destination);
+                } catch (e) {
+                    console.log('Audio not available');
+                }
+            }
 
-    <div id="joystick-zone" class="disabled">
-      <div id="joystick-base">
-        <div id="joystick-thumb"></div>
-      </div>
-    </div>
+            resume() {
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
 
-    <button id="interact-btn" class="disabled">💬</button>
+            stopAll() {
+                this.activeOscillators.forEach(osc => {
+                    try { osc.stop(); } catch (e) {}
+                });
+                this.activeOscillators = [];
+                this.isPlaying = false;
+            }
 
-    <div id="dialogue-overlay">
-      <div id="dialogue-speaker"></div>
-      <div id="dialogue-text"></div>
-    </div>
+            playNote(freq, duration, type = 'sine', vol = 0.18, delay = 0) {
+                if (!this.ctx || !this.gainNode) return;
+                this.resume();
+                const now = this.ctx.currentTime + delay;
+                const osc = this.ctx.createOscillator();
+                const noteGain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.value = freq;
+                noteGain.gain.setValueAtTime(0, now);
+                noteGain.gain.linearRampToValueAtTime(vol, now + 0.08);
+                noteGain.gain.linearRampToValueAtTime(vol * 0.7, now + duration * 0.6);
+                noteGain.gain.linearRampToValueAtTime(0, now + duration);
+                osc.connect(noteGain);
+                noteGain.connect(this.gainNode);
+                osc.start(now);
+                osc.stop(now + duration + 0.05);
+                this.activeOscillators.push(osc);
+                // Clean up
+                setTimeout(() => {
+                    const idx = this.activeOscillators.indexOf(osc);
+                    if (idx > -1) this.activeOscillators.splice(idx, 1);
+                }, (duration + delay + 0.1) * 1000);
+            }
 
-    <div id="memory-overlay">
-      <div id="memory-text"></div>
-    </div>
+            playChord(notes, duration, type = 'sine', vol = 0.12, delay = 0) {
+                notes.forEach(freq => this.playNote(freq, duration, type, vol, delay));
+            }
 
-    <div id="letter-overlay">
-      <div id="letter-box">
-        <div id="letter-text"></div>
-        <button id="letter-btn">One More Thing...</button>
-      </div>
-    </div>
+            // Warm piano-like melody
+            playWarmMelody() {
+                this.currentMood = 'warm';
+                const melody = [
+                    [261.63, 0.8],
+                    [329.63, 0.7],
+                    [392.00, 0.9],
+                    [329.63, 0.6],
+                    [349.23, 0.7],
+                    [293.66, 0.8],
+                    [261.63, 0.9],
+                    [220.00, 0.7],
+                ];
+                const chordNotes = [
+                    [261.63, 329.63, 392.00],
+                    [293.66, 349.23, 440.00],
+                    [261.63, 329.63, 392.00],
+                    [220.00, 293.66, 349.23],
+                ];
 
-    <div id="final-text-overlay">
-      <div id="final-text"></div>
-    </div>
+                let time = 0;
+                const loop = () => {
+                    if (!this.isPlaying || this.currentMood !== 'warm') return;
+                    const chordIdx = Math.floor(time / 3.2) % chordNotes.length;
+                    this.playChord(chordNotes[chordIdx], 3.0, 'sine', 0.07, 0);
+                    const noteIdx = time % melody.length;
+                    this.playNote(melody[noteIdx][0], melody[noteIdx][1], 'triangle', 0.14, 0.15);
+                    time++;
+                    this._warmTimeout = setTimeout(loop, 1100 + Math.random() * 400);
+                };
+                loop();
+            }
 
-    <div id="end-overlay">
-      <h1>FIND ME</h1>
-      <p>Made with love, for Avril.</p>
-      <button id="play-again-btn">Play Again</button>
-    </div>
+            playSoftMelody() {
+                this.currentMood = 'soft';
+                const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66];
+                let i = 0;
+                const loop = () => {
+                    if (!this.isPlaying || this.currentMood !== 'soft') return;
+                    this.playNote(notes[i % notes.length], 1.5, 'sine', 0.10, 0);
+                    this.playNote(notes[(i + 2) % notes.length] / 2, 1.8, 'sine', 0.06, 0.3);
+                    i++;
+                    this._softTimeout = setTimeout(loop, 1600 + Math.random() * 500);
+                };
+                loop();
+            }
 
-    <div id="start-overlay">
-      <h1>FIND ME</h1>
-      <p>A short cozy journey made for Avril.<br />Tap below to begin.</p>
-      <button id="start-btn">Start</button>
-    </div>
-  </div>
+            playBrightMelody() {
+                this.currentMood = 'bright';
+                const notes = [392.00, 440.00, 493.88, 523.25, 587.33, 523.25, 493.88, 440.00];
+                let i = 0;
+                const loop = () => {
+                    if (!this.isPlaying || this.currentMood !== 'bright') return;
+                    this.playChord([notes[i % notes.length], notes[(i + 2) % notes.length]], 2.0, 'triangle',
+                        0.09, 0);
+                    this.playNote(notes[i % notes.length] * 1.5, 1.2, 'sine', 0.07, 0.2);
+                    i++;
+                    this._brightTimeout = setTimeout(loop, 1300 + Math.random() * 350);
+                };
+                loop();
+            }
 
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script>
-    // =====================================================================
-    //  EDIT YOUR LETTER AND PERSONAL DETAILS HERE
-    // =====================================================================
-    const MY_NAME = 'Kael'; // <-- change this to your name
-    const AVRIL_NAME = 'Avril';
-    const ANNIVERSARY_TEXT = 'Happy 17 Months ❤️';
+            playNightMelody() {
+                this.currentMood = 'night';
+                const notes = [196.00, 220.00, 261.63, 293.66, 261.63, 220.00, 196.00, 174.61];
+                let i = 0;
+                const loop = () => {
+                    if (!this.isPlaying || this.currentMood !== 'night') return;
+                    this.playNote(notes[i % notes.length], 2.2, 'sine', 0.09, 0);
+                    this.playNote(notes[(i + 3) % notes.length] / 2, 2.5, 'sine', 0.05, 0.5);
+                    i++;
+                    this._nightTimeout = setTimeout(loop, 2000 + Math.random() * 600);
+                };
+                loop();
+            }
 
-    const LETTER_PARAGRAPHS = [
-      'Happy 17 Months, my love.',
-      '',
-      'If you ever wondered where I was...',
-      'I was always somewhere hoping you\'d find me.',
-      '',
-      'Maybe that\'s what these 17 months have felt like sometimes.',
-      'Two people trying to find their way through distance, busy days, missed moments, and everything life puts between them.',
-      '',
-      'But somehow, we always find our way back to each other.',
-      '',
-      'Thank you for every conversation.',
-      'Every laugh.',
-      'Every little memory.',
-      'Every moment you made an ordinary day feel special.',
-      '',
-      'Thank you for staying.',
-      '',
-      'And if I could choose one thing...',
-      'It would be to keep finding you, again and again, no matter how far apart we are.',
-      '',
-      'Because if finding you means crossing every distance...',
-      'I\'d do it.',
-      'Every time.',
-      '',
-      'Happy 17 Months, Avril.',
-      'I love you.'
-    ];
-    // =====================================================================
+            playEndingMelody() {
+                this.currentMood = 'ending';
+                const chords = [
+                    [261.63, 392.00, 523.25],
+                    [293.66, 440.00, 587.33],
+                    [329.63, 493.88, 659.25],
+                    [349.23, 523.25, 698.46],
+                    [392.00, 587.33, 783.99],
+                ];
+                let i = 0;
+                const loop = () => {
+                    if (!this.isPlaying || this.currentMood !== 'ending') return;
+                    this.playChord(chords[i % chords.length], 3.5, 'sine', 0.10, 0);
+                    this.playNote(chords[i % chords.length][0], 3.0, 'triangle', 0.12, 0.3);
+                    i++;
+                    this._endingTimeout = setTimeout(loop, 3500);
+                };
+                loop();
+                // Gradually fade out after some time
+                setTimeout(() => {
+                    if (this.gainNode && this.currentMood === 'ending') {
+                        this.gainNode.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 6);
+                    }
+                }, 18000);
+            }
 
-    // Game state bridge between DOM and Phaser.
-    const Game = {
-      scene: null,
-      audio: null,
-      controlsEnabled: false,
-      dialogueActive: false,
-      inCinematic: false,
-      inputVector: { x: 0, y: 0 },
-      interactPressed: false
-    };
-
-    // ---------------------------------------------------------------
-    //  Audio Manager — tiny WebAudio synth for gentle background music
-    // ---------------------------------------------------------------
-    class AudioManager {
-      constructor() {
-        this.ctx = null;
-        this.masterGain = null;
-        this.musicGain = null;
-        this.sfxGain = null;
-        this.muted = false;
-        this.mood = 'title';
-        this.timer = null;
-        this.step = 0;
-      }
-
-      start() {
-        if (!this.ctx) {
-          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-          this.masterGain = this.ctx.createGain();
-          this.masterGain.gain.value = 1;
-          this.masterGain.connect(this.ctx.destination);
-
-          this.musicGain = this.ctx.createGain();
-          this.musicGain.gain.value = 0.28;
-          this.musicGain.connect(this.masterGain);
-
-          this.sfxGain = this.ctx.createGain();
-          this.sfxGain.gain.value = 0.45;
-          this.sfxGain.connect(this.masterGain);
-
-          this.scheduleMusic();
+            setVolume(v) {
+                this.volume = v;
+                if (this.gainNode) {
+                    this.gainNode.gain.value = v;
+                }
+            }
         }
-        if (this.ctx.state === 'suspended') this.ctx.resume();
-      }
 
-      setMood(mood) {
-        this.mood = mood;
-        this.step = 0;
-      }
+        const music = new MusicManager();
 
-      scheduleMusic() {
-        const stepDuration = 620; // ms per gentle note
-        if (this.timer) clearInterval(this.timer);
-        this.timer = setInterval(() => {
-          if (this.muted || !this.ctx || this.ctx.state !== 'running') return;
-          const notes = this.getMoodNotes();
-          const freq = notes[this.step % notes.length];
-          this.playTone(freq, stepDuration * 1.9, 'sine', this.musicGain, 0.075);
+        // ──────────────────────────────────────────────
+        //  GAME CONFIGURATION
+        // ──────────────────────────────────────────────
+        const GAME_WIDTH = 640;
+        const GAME_HEIGHT = 400;
 
-          if (this.step % 4 === 0) {
-            this.playTone(freq / 2, stepDuration * 3.2, 'triangle', this.musicGain, 0.05);
-          }
-
-          // occasional soft high sparkle
-          if (this.step % 8 === 4) {
-            this.playTone(freq * 2, stepDuration * 1.2, 'sine', this.musicGain, 0.025);
-          }
-
-          this.step++;
-        }, stepDuration);
-      }
-
-      getMoodNotes() {
-        switch (this.mood) {
-          case 'opening': return [261.63, 329.63, 392.00, 523.25]; // C E G C
-          case 'day': return [329.63, 392.00, 493.88, 659.25]; // E G B E
-          case 'night': return [293.66, 349.23, 440.00, 587.33]; // D F A D
-          case 'memory': return [261.63, 329.63, 392.00, 523.25];
-          case 'final': return [392.00, 493.88, 587.33, 783.99];
-          case 'letter': return [261.63, 329.63, 392.00, 523.25];
-          case 'ending': return [349.23, 440.00, 587.33, 698.46];
-          default: return [329.63, 392.00, 493.88, 659.25];
-        }
-      }
-
-      playTone(freq, dur, type, dest, volume) {
-        if (!this.ctx || this.muted) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = type;
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(volume, this.ctx.currentTime + 0.04);
-        gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + dur);
-        osc.connect(gain);
-        gain.connect(dest);
-        osc.start(this.ctx.currentTime);
-        osc.stop(this.ctx.currentTime + dur + 0.05);
-      }
-
-      playSFX(name) {
-        if (!this.ctx || this.muted) return;
-        const now = this.ctx.currentTime;
-        if (name === 'interact') {
-          this.playTone(660, 0.18, 'sine', this.sfxGain, 0.2);
-          this.playTone(880, 0.22, 'sine', this.sfxGain, 0.15);
-        } else if (name === 'clue') {
-          this.playTone(523.25, 0.25, 'sine', this.sfxGain, 0.18);
-          this.playTone(659.25, 0.3, 'sine', this.sfxGain, 0.16);
-          this.playTone(783.99, 0.35, 'sine', this.sfxGain, 0.12);
-        } else if (name === 'memory') {
-          this.playTone(392, 0.35, 'sine', this.sfxGain, 0.15);
-          this.playTone(493.88, 0.4, 'sine', this.sfxGain, 0.13);
-        } else if (name === 'soft') {
-          this.playTone(440, 0.35, 'sine', this.sfxGain, 0.12);
-        }
-      }
-
-      toggleMute() {
-        this.muted = !this.muted;
-        if (this.masterGain) this.masterGain.gain.value = this.muted ? 0 : 1;
-      }
-    }
-
-    Game.audio = new AudioManager();
-
-    // ---------------------------------------------------------------
-    //  DOM controls (joystick, interact, dialogue, letter, overlays)
-    // ---------------------------------------------------------------
-    const joystickZone = document.getElementById('joystick-zone');
-    const joystickBase = document.getElementById('joystick-base');
-    const joystickThumb = document.getElementById('joystick-thumb');
-    const interactBtn = document.getElementById('interact-btn');
-    const dialogueOverlay = document.getElementById('dialogue-overlay');
-    const dialogueSpeaker = document.getElementById('dialogue-speaker');
-    const dialogueText = document.getElementById('dialogue-text');
-    const memoryOverlay = document.getElementById('memory-overlay');
-    const memoryText = document.getElementById('memory-text');
-    const letterOverlay = document.getElementById('letter-overlay');
-    const letterText = document.getElementById('letter-text');
-    const letterBtn = document.getElementById('letter-btn');
-    const finalTextOverlay = document.getElementById('final-text-overlay');
-    const finalText = document.getElementById('final-text');
-    const endOverlay = document.getElementById('end-overlay');
-    const startOverlay = document.getElementById('start-overlay');
-    const startBtn = document.getElementById('start-btn');
-    const muteBtn = document.getElementById('mute-btn');
-    const rotateOverlay = document.getElementById('rotate-overlay');
-
-    let joystickTouchId = null;
-    const JOY_MAX_RADIUS = 38;
-
-    function getJoystickCenter() {
-      const rect = joystickBase.getBoundingClientRect();
-      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-    }
-
-    function updateJoystickFromPoint(clientX, clientY) {
-      if (!Game.controlsEnabled || Game.dialogueActive || Game.inCinematic) {
-        Game.inputVector = { x: 0, y: 0 };
-        return;
-      }
-      const center = getJoystickCenter();
-      const dx = clientX - center.x;
-      const dy = clientY - center.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const clamped = Math.min(dist, JOY_MAX_RADIUS);
-      const angle = Math.atan2(dy, dx);
-      const tx = Math.cos(angle) * clamped;
-      const ty = Math.sin(angle) * clamped;
-
-      joystickThumb.style.transform = `translate(${tx}px, ${ty}px)`;
-
-      if (dist < 1) {
-        Game.inputVector = { x: 0, y: 0 };
-      } else {
-        let nx = dx / JOY_MAX_RADIUS;
-        let ny = dy / JOY_MAX_RADIUS;
-        const len = Math.sqrt(nx * nx + ny * ny);
-        if (len > 1) { nx /= len; ny /= len; }
-        Game.inputVector = { x: nx, y: ny };
-      }
-    }
-
-    function resetJoystick() {
-      joystickTouchId = null;
-      joystickThumb.style.transform = 'translate(0, 0)';
-      Game.inputVector = { x: 0, y: 0 };
-      joystickBase.classList.remove('active');
-    }
-
-    joystickZone.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      if (!Game.controlsEnabled || Game.dialogueActive || Game.inCinematic) return;
-      const touch = e.changedTouches[0];
-      joystickTouchId = touch.identifier;
-      joystickBase.classList.add('active');
-      updateJoystickFromPoint(touch.clientX, touch.clientY);
-    }, { passive: false });
-
-    joystickZone.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      for (const touch of e.changedTouches) {
-        if (touch.identifier === joystickTouchId) {
-          updateJoystickFromPoint(touch.clientX, touch.clientY);
-        }
-      }
-    }, { passive: false });
-
-    joystickZone.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      for (const touch of e.changedTouches) {
-        if (touch.identifier === joystickTouchId) resetJoystick();
-      }
-    }, { passive: false });
-
-    joystickZone.addEventListener('touchcancel', resetJoystick);
-
-    // Mouse / desktop joystick support
-    joystickZone.addEventListener('mousedown', (e) => {
-      if (!Game.controlsEnabled || Game.dialogueActive || Game.inCinematic) return;
-      joystickTouchId = 'mouse';
-      joystickBase.classList.add('active');
-      updateJoystickFromPoint(e.clientX, e.clientY);
-    });
-    window.addEventListener('mousemove', (e) => {
-      if (joystickTouchId === 'mouse') updateJoystickFromPoint(e.clientX, e.clientY);
-    });
-    window.addEventListener('mouseup', () => {
-      if (joystickTouchId === 'mouse') resetJoystick();
-    });
-
-    // Interact button
-    function handleInteractDown(e) {
-      e.preventDefault();
-      Game.interactPressed = true;
-      if (Game.scene && Game.scene.handleInteract) Game.scene.handleInteract();
-    }
-
-    interactBtn.addEventListener('touchstart', handleInteractDown, { passive: false });
-    interactBtn.addEventListener('mousedown', handleInteractDown);
-    interactBtn.addEventListener('touchend', (e) => { e.preventDefault(); Game.interactPressed = false; });
-    interactBtn.addEventListener('mouseup', () => { Game.interactPressed = false; });
-
-    // Dialogue tap-to-continue
-    dialogueOverlay.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      if (Game.scene && Game.dialogueActive) Game.scene.advanceDialogue();
-    });
-
-    // Letter overlay tap-to-skip typewriter
-    letterOverlay.addEventListener('click', (e) => {
-      if (e.target === letterOverlay || e.target === letterText || e.target.id === 'letter-box') {
-        if (letterTyping) skipLetterTyping();
-      }
-    });
-
-    // Letter button
-    letterBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      letterOverlay.classList.remove('active');
-      if (Game.scene && Game.scene.showFinalScene) Game.scene.showFinalScene();
-    });
-
-    // Mute
-    muteBtn.addEventListener('click', () => {
-      Game.audio.toggleMute();
-      muteBtn.textContent = Game.audio.muted ? '🔇' : '🔊';
-    });
-
-    // Play again
-    document.getElementById('play-again-btn').addEventListener('click', () => {
-      location.reload();
-    });
-
-    // Start overlay
-    startBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      Game.audio.start();
-      Game.audio.setMood('opening');
-      startOverlay.classList.add('hidden');
-      if (Game.scene && Game.scene.startOpening) Game.scene.startOpening();
-    });
-
-    // Orientation guard (touch devices only)
-    function checkOrientation() {
-      const isTouch = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-      const isLandscape = window.innerWidth > window.innerHeight;
-      rotateOverlay.classList.toggle('active', isTouch && isLandscape);
-    }
-    window.addEventListener('resize', checkOrientation);
-    checkOrientation();
-
-    // ---------------------------------------------------------------
-    //  Phaser Game Scene
-    // ---------------------------------------------------------------
-    class GameScene extends Phaser.Scene {
-      constructor() {
-        super('GameScene');
-        this.worldWidth = 2600;
-        this.worldHeight = 1800;
-        this.objective = 0;
-        this.finalPathActive = false;
-        this.revealTriggered = false;
-        this.currentInteractable = null;
-        this.typing = false;
-        this.dialogueLines = [];
-        this.dialogueIndex = 0;
-        this.dialogueCallback = null;
-        this.typewriterTimer = null;
-        this.typewriterCb = null;
-        this.autoLineTimer = null;
-        this.autoAdvance = false;
-      }
-
-      create() {
-        Game.scene = this;
-        this.cameras.main.setRoundPixels(true);
-        this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
-        this.physics.world.gravity.y = 0;
-        this.cameras.main.setBackgroundColor('#8db5d6');
-
-        this.createTextures();
-        this.createWorld();
-        this.createPlayer();
-        this.createNPCsAndObjects();
-        this.createAmbient();
-        this.createInteractionMarker();
-
-        this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
-        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-
-        this.physics.add.collider(this.player, this.trees);
-        this.player.body.setCollideWorldBounds(true);
-
-        // Start hidden/disabled
-        this.setControlsEnabled(false);
-        this.nightOverlay.setVisible(false);
-        this.sunsetOverlay.setVisible(false);
-        this.stars.children.iterate((s) => s.setAlpha(0));
-        this.fireflies.children.iterate((f) => f.setAlpha(0));
-      }
-
-      createTextures() {
-        const av = {
-          Y: '#f4a261', b: '#f7d9aa', E: '#4a2e1b', R: '#e8a0b4', '.': 'rgba(0,0,0,0)'
+        const config = {
+            type: Phaser.AUTO,
+            width: GAME_WIDTH,
+            height: GAME_HEIGHT,
+            parent: 'game-container',
+            pixelArt: true,
+            roundPixels: true,
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH,
+                width: GAME_WIDTH,
+                height: GAME_HEIGHT,
+                max: {
+                    width: 1280,
+                    height: 800,
+                },
+            },
+            backgroundColor: '#000000',
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 600 },
+                    debug: false,
+                },
+            },
+            scene: [],
         };
-        this.createPixelTexture('avril', [
-          '....YYYY....',
-          '...YYYYYY...',
-          '..YYbbbbYY..',
-          '.YbbbbbbbbY.',
-          '.YbbbbbbbbY.',
-          '.YbEYbbEYbY.',
-          '.YbbbbbbbbY.',
-          '.YbbbbbbbbY.',
-          '..YbbbbbbY..',
-          '...YYYYYY...',
-          '....RRRR....',
-          '...RRRRRR...',
-          '..RRRRRRRR..',
-          '..RRRRRRRR..',
-          '..RRR..RRR..',
-          '...RR..RR...'
-        ], av, 4);
 
-        const mePal = {
-          B: '#3e2a1e', b: '#f0c8a0', E: '#3a2a2a', C: '#6b8ca6', '.': 'rgba(0,0,0,0)'
+        // ──────────────────────────────────────────────
+        //  GLOBAL STATE
+        // ──────────────────────────────────────────────
+        const GameState = {
+            playerSpeed: 160,
+            normalSpeed: 160,
+            slowSpeed: 80,
+            verySlowSpeed: 40,
+            canMove: true,
+            dialogueActive: false,
+            currentDialogue: [],
+            dialogueIndex: 0,
+            nearInteractable: null,
+            sceneName: '',
+            bridgeFell: false,
+            approachingHer: false,
+            metHer: false,
         };
-        this.createPixelTexture('me', [
-          '....BBBB....',
-          '...BBBBBB...',
-          '..BBbbbbBB..',
-          '.BBbbbbbbBB.',
-          '.BBbEYbbEbB.',
-          '.BBbbbbbbBB.',
-          '..BBbbbbBB..',
-          '...BBBBBB...',
-          '....CCCC....',
-          '...CCCCCC...',
-          '..CCCCCCCC..',
-          '..CCCCCCCC..',
-          '..CCC..CCC..',
-          '...CC...CC..'
-        ], mePal, 4);
 
-        const npc1Pal = {
-          H: '#d8cfc4', b: '#f0c8a0', E: '#3a2a2a', G: '#7a9b76', '.': 'rgba(0,0,0,0)'
-        };
-        this.createPixelTexture('npc1', [
-          '....HHHH....',
-          '...HHHHHH...',
-          '..HHbbbbHH..',
-          '.HbbEbbEbbH.',
-          '.HbbbbbbbbH.',
-          '.HbbbbbbbbH.',
-          '..HbbbbbbH..',
-          '...HHHHHH...',
-          '....GGGG....',
-          '...GGGGGG...',
-          '..GGGGGGGG..',
-          '..GGGGGGGG..',
-          '..GGG..GGG..',
-          '...GG...GG..'
-        ], npc1Pal, 4);
+        // ──────────────────────────────────────────────
+        //  HELPER: Generate pixel textures
+        // ──────────────────────────────────────────────
+        function createPixelTextures(scene) {
+            // --- Player character (16x24 scaled) ---
+            const playerGfx = scene.make.graphics({ x: 0, y: 0, add: false });
+            // Body (blue shirt)
+            playerGfx.fillStyle(0x4488cc);
+            playerGfx.fillRect(4, 8, 8, 8);
+            // Arms
+            playerGfx.fillStyle(0x5599dd);
+            playerGfx.fillRect(1, 9, 3, 5);
+            playerGfx.fillRect(12, 9, 3, 5);
+            // Head
+            playerGfx.fillStyle(0xffddaa);
+            playerGfx.fillRect(5, 1, 6, 7);
+            // Hair
+            playerGfx.fillStyle(0x332211);
+            playerGfx.fillRect(4, 0, 8, 3);
+            playerGfx.fillRect(3, 1, 2, 2);
+            // Legs
+            playerGfx.fillStyle(0x444466);
+            playerGfx.fillRect(5, 16, 3, 6);
+            playerGfx.fillRect(9, 16, 3, 6);
+            // Shoes
+            playerGfx.fillStyle(0x553322);
+            playerGfx.fillRect(4, 22, 4, 2);
+            playerGfx.fillRect(8, 22, 4, 2);
+            // Eyes
+            playerGfx.fillStyle(0x000000);
+            playerGfx.fillRect(7, 3, 1, 1);
+            playerGfx.fillRect(9, 3, 1, 1);
+            playerGfx.generateTexture('player', 16, 24);
+            playerGfx.destroy();
 
-        const npc2Pal = {
-          G: '#a3c9a8', b: '#f0c8a0', E: '#3a2a2a', O: '#e0a66b', '.': 'rgba(0,0,0,0)'
-        };
-        this.createPixelTexture('npc2', [
-          '....GGGG....',
-          '...GGGGGG...',
-          '..GGbbbbGG..',
-          '.GbbEbbEbbG.',
-          '.GbbbbbbbbG.',
-          '.GbbbbbbbbG.',
-          '..GbbbbbbG..',
-          '...GGGGGG...',
-          '....OOOO....',
-          '...OOOOOO...',
-          '..OOOOOOOO..',
-          '..OOOOOOOO..',
-          '..OOO..OOO..',
-          '...OO...OO..'
-        ], npc2Pal, 4);
+            // --- Girl character ---
+            const girlGfx = scene.make.graphics({ x: 0, y: 0, add: false });
+            // Dress (pink/red)
+            girlGfx.fillStyle(0xdd6688);
+            girlGfx.fillRect(4, 8, 8, 9);
+            // Arms
+            girlGfx.fillStyle(0xee7799);
+            girlGfx.fillRect(1, 9, 3, 5);
+            girlGfx.fillRect(12, 9, 3, 5);
+            // Head
+            girlGfx.fillStyle(0xffddaa);
+            girlGfx.fillRect(5, 1, 6, 7);
+            // Longer hair
+            girlGfx.fillStyle(0x442211);
+            girlGfx.fillRect(3, 0, 10, 4);
+            girlGfx.fillRect(2, 3, 3, 5);
+            girlGfx.fillRect(11, 3, 3, 5);
+            // Legs
+            girlGfx.fillStyle(0x444466);
+            girlGfx.fillRect(5, 17, 3, 5);
+            girlGfx.fillRect(9, 17, 3, 5);
+            // Shoes
+            girlGfx.fillStyle(0x553322);
+            girlGfx.fillRect(4, 22, 4, 2);
+            girlGfx.fillRect(8, 22, 4, 2);
+            // Eyes
+            girlGfx.fillStyle(0x000000);
+            girlGfx.fillRect(7, 3, 1, 1);
+            girlGfx.fillRect(9, 3, 1, 1);
+            // Smile
+            girlGfx.fillStyle(0xcc5555);
+            girlGfx.fillRect(7, 6, 3, 1);
+            girlGfx.generateTexture('girl', 16, 24);
+            girlGfx.destroy();
 
-        const npc3Pal = {
-          P: '#b79bce', b: '#f0c8a0', E: '#3a2a2a', S: '#6d8bb0', '.': 'rgba(0,0,0,0)'
-        };
-        this.createPixelTexture('npc3', [
-          '....PPPP....',
-          '...PPPPPP...',
-          '..PPbbbbPP..',
-          '.PbbEbbEbbP.',
-          '.PbbbbbbbbP.',
-          '.PbbbbbbbbP.',
-          '..PbbbbbbP..',
-          '...PPPPPP...',
-          '....SSSS....',
-          '...SSSSSS...',
-          '..SSSSSSSS..',
-          '..SSSSSSSS..',
-          '..SSS..SSS..',
-          '...SS...SS..'
-        ], npc3Pal, 4);
+            // --- Heart particle ---
+            const heartGfx = scene.make.graphics({ x: 0, y: 0, add: false });
+            heartGfx.fillStyle(0xff4466);
+            heartGfx.fillRect(2, 1, 2, 2);
+            heartGfx.fillRect(6, 1, 2, 2);
+            heartGfx.fillRect(0, 2, 2, 2);
+            heartGfx.fillRect(8, 2, 2, 2);
+            heartGfx.fillRect(1, 3, 8, 3);
+            heartGfx.fillRect(2, 6, 6, 2);
+            heartGfx.fillRect(3, 8, 4, 1);
+            heartGfx.fillRect(4, 9, 2, 1);
+            heartGfx.generateTexture('heart', 10, 10);
+            heartGfx.destroy();
 
-        const treePal = { L: '#4f7f4f', T: '#7a5230', '.': 'rgba(0,0,0,0)' };
-        this.createPixelTexture('tree', [
-          '......LLLL......',
-          '.....LLLLLL.....',
-          '....LLLLLLLL....',
-          '...LLLLLLLLLL...',
-          '..LLLLLLLLLLLL..',
-          '..LLLLLLLLLLLL..',
-          '..LLLLLLLLLLLL..',
-          '...LLLLLLLLLL...',
-          '....LLLLLLLL....',
-          '......TTTT......',
-          '......TTTT......',
-          '......TTTT......'
-        ], treePal, 3);
+            // --- Firefly glow ---
+            const fireflyGfx = scene.make.graphics({ x: 0, y: 0, add: false });
+            fireflyGfx.fillStyle(0xffff88, 0.9);
+            fireflyGfx.fillCircle(4, 4, 4);
+            fireflyGfx.fillStyle(0xffffcc, 0.5);
+            fireflyGfx.fillCircle(4, 4, 2);
+            fireflyGfx.generateTexture('firefly', 8, 8);
+            fireflyGfx.destroy();
 
-        const orbPal = { Y: '#fff3b0', W: '#ffffff', '.': 'rgba(0,0,0,0)' };
-        this.createPixelTexture('orb', [
-          '...YY...',
-          '..YWWY..',
-          '.YWWWWY.',
-          '.YWWWWY.',
-          '.YWWWWY.',
-          '..YWWY..',
-          '...YY...',
-          '........'
-        ], orbPal, 4);
+            // --- Flower petal ---
+            const petalGfx = scene.make.graphics({ x: 0, y: 0, add: false });
+            petalGfx.fillStyle(0xff99bb);
+            petalGfx.fillRect(1, 0, 3, 2);
+            petalGfx.fillRect(0, 1, 5, 3);
+            petalGfx.fillRect(1, 4, 3, 2);
+            petalGfx.generateTexture('petal', 5, 6);
+            petalGfx.destroy();
 
-        const flowerPal = { F: '#f4a6c0', G: '#5a8f5a', '.': 'rgba(0,0,0,0)' };
-        this.createPixelTexture('flower', [
-          '...F....',
-          '..FFF...',
-          '.FFFFF..',
-          '..FFF...',
-          '...G....',
-          '...G....',
-          '..GGG...',
-          '........'
-        ], flowerPal, 4);
+            // --- Raindrop ---
+            const rainGfx = scene.make.graphics({ x: 0, y: 0, add: false });
+            rainGfx.fillStyle(0xaaccff, 0.7);
+            rainGfx.fillRect(1, 0, 2, 8);
+            rainGfx.generateTexture('raindrop', 4, 8);
+            rainGfx.destroy();
 
-        const heartPal = { H: '#ff8fa3', '.': 'rgba(0,0,0,0)' };
-        this.createPixelTexture('heart', [
-          '........',
-          '.HH..HH.',
-          '.HHHHHH.',
-          '.HHHHHH.',
-          '..HHHH..',
-          '...HH...',
-          '........',
-          '........'
-        ], heartPal, 4);
+            // --- Star ---
+            const starGfx = scene.make.graphics({ x: 0, y: 0, add: false });
+            starGfx.fillStyle(0xffffff, 0.9);
+            starGfx.fillRect(1, 0, 1, 3);
+            starGfx.fillRect(0, 1, 3, 1);
+            starGfx.generateTexture('star', 3, 3);
+            starGfx.destroy();
 
-        const fireflyPal = { Y: '#fffbb0', W: '#ffffff', '.': 'rgba(0,0,0,0)' };
-        this.createPixelTexture('firefly', [
-          '.Y..',
-          'YWWY',
-          'YWWY',
-          '.Y..'
-        ], fireflyPal, 3);
+            // --- Leaf ---
+            const leafGfx = scene.make.graphics({ x: 0, y: 0, add: false });
+            leafGfx.fillStyle(0xcc8844);
+            leafGfx.fillRect(1, 0, 3, 2);
+            leafGfx.fillRect(0, 2, 5, 3);
+            leafGfx.fillRect(1, 5, 3, 1);
+            leafGfx.generateTexture('leaf', 5, 6);
+            leafGfx.destroy();
 
-        const starPal = { W: '#ffffff', '.': 'rgba(0,0,0,0)' };
-        this.createPixelTexture('star', [
-          '.W',
-          'W.'
-        ], starPal, 3);
-
-        const markerPal = { W: '#ffffff', '.': 'rgba(0,0,0,0)' };
-        this.createPixelTexture('marker', [
-          '.W.',
-          '.W.',
-          '.W.',
-          '.W.',
-          '...',
-          '.W.',
-          '...',
-          '...'
-        ], markerPal, 3);
-      }
-
-      createPixelTexture(key, rows, palette, scale) {
-        const w = rows[0].length;
-        const h = rows.length;
-        const canvas = this.textures.createCanvas(key, w * scale, h * scale);
-        const ctx = canvas.context;
-        ctx.imageSmoothingEnabled = false;
-        ctx.clearRect(0, 0, w * scale, h * scale);
-        for (let y = 0; y < h; y++) {
-          const row = rows[y];
-          for (let x = 0; x < w; x++) {
-            const c = row[x];
-            if (c === '.' || c === ' ') continue;
-            const color = palette[c] || '#ff00ff';
-            ctx.fillStyle = color;
-            ctx.fillRect(x * scale, y * scale, scale, scale);
-          }
-        }
-        canvas.refresh();
-      }
-
-      createWorld() {
-        // Ground
-        this.groundRect = this.add.rectangle(0, this.worldHeight * 0.4, this.worldWidth, this.worldHeight * 0.6, 0x6a9e6a).setOrigin(0);
-        this.groundRect.setDepth(-10);
-
-        // Path
-        const pathColor = 0xe8d1a7;
-        this.add.rectangle(250, 420, 90, 700, pathColor).setDepth(-9);
-        this.add.rectangle(250, 800, 800, 80, pathColor).setDepth(-9);
-        this.add.rectangle(900, 650, 80, 500, pathColor).setDepth(-9);
-        this.add.rectangle(900, 1100, 800, 80, pathColor).setDepth(-9);
-        this.add.rectangle(1700, 500, 80, 700, pathColor).setDepth(-9);
-        this.add.rectangle(1700, 800, 800, 80, pathColor).setDepth(-9);
-
-        // Pond
-        this.add.ellipse(1300, 1150, 180, 120, 0x5b8db0).setDepth(-8);
-        this.ripple = this.add.ellipse(1300, 1150, 180, 120, 0xffffff, 0.08).setDepth(-8);
-        this.tweens.add({
-          targets: this.ripple,
-          scaleX: 1.08,
-          scaleY: 1.08,
-          alpha: 0,
-          duration: 2400,
-          repeat: -1,
-          yoyo: true,
-          ease: 'Sine.easeOut'
-        });
-
-        // Trees
-        this.trees = this.physics.add.staticGroup();
-        [
-          [250, 320],
-          [700, 800],
-          [1300, 1000],
-          [1800, 500],
-          [2400, 700],
-          [400, 1200],
-          [2000, 1200]
-        ].forEach(([x, y]) => {
-          const tree = this.trees.create(x, y, 'tree');
-          tree.setDepth(5);
-          tree.body.setSize(40, 40);
-          tree.body.setOffset(-14, -12);
-        });
-
-        // Night overlay, used later
-        this.nightOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0x0a1030, 0.55);
-        this.nightOverlay.setDepth(-1);
-        this.nightOverlay.setVisible(false);
-
-        // Sunset overlay, used later
-        this.sunsetOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0xffb347, 0.22);
-        this.sunsetOverlay.setDepth(-1);
-        this.sunsetOverlay.setVisible(false);
-      }
-
-      createPlayer() {
-        this.player = this.physics.add.sprite(250, 450, 'avril');
-        this.player.setDepth(10);
-        this.player.body.setSize(24, 24, true);
-        this.player.body.setOffset(-4, -6);
-        this.player.setCollideWorldBounds(true);
-        this.tweens.add({
-          targets: this.player,
-          y: this.player.y - 2,
-          duration: 900,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
-        });
-      }
-
-      createNPCsAndObjects() {
-        this.npc1 = this.physics.add.sprite(850, 650, 'npc1');
-        this.npc1.setDepth(10);
-        this.npc1.id = 'npc1';
-        this.npc1.label = 'Talk';
-        this.npc1.body.setSize(24, 24, true);
-        this.npc1.body.setOffset(-4, -6);
-
-        this.npc2 = this.physics.add.sprite(1350, 1100, 'npc2');
-        this.npc2.setDepth(10);
-        this.npc2.id = 'npc2';
-        this.npc2.label = 'Talk';
-        this.npc2.body.setSize(24, 24, true);
-        this.npc2.body.setOffset(-4, -6);
-
-        this.npc3 = this.physics.add.sprite(1750, 500, 'npc3');
-        this.npc3.setDepth(10);
-        this.npc3.id = 'npc3';
-        this.npc3.label = 'Talk';
-        this.npc3.body.setSize(24, 24, true);
-        this.npc3.body.setOffset(-4, -6);
-
-        this.playerMe = this.physics.add.sprite(2400, 800, 'me');
-        this.playerMe.setDepth(10);
-        this.playerMe.setVisible(false);
-        this.playerMe.body.setSize(24, 24, true);
-        this.playerMe.body.setOffset(-4, -6);
-
-        // Clue object
-        this.clue1 = this.physics.add.sprite(900, 680, 'orb');
-        this.clue1.setDepth(10);
-        this.clue1.id = 'clue1';
-        this.clue1.label = 'Examine';
-        this.clue1.setVisible(false);
-        this.clue1.body.setSize(20, 20, true);
-
-        // Memory object
-        this.memoryObject = this.physics.add.sprite(2100, 1000, 'flower');
-        this.memoryObject.setDepth(10);
-        this.memoryObject.id = 'memory';
-        this.memoryObject.label = 'Look';
-        this.memoryObject.setVisible(false);
-        this.memoryObject.body.setSize(20, 20, true);
-      }
-
-      createAmbient() {
-        this.stars = this.add.group();
-        for (let i = 0; i < 50; i++) {
-          const x = Phaser.Math.Between(0, this.worldWidth);
-          const y = Phaser.Math.Between(0, this.worldHeight * 0.4);
-          const star = this.add.image(x, y, 'star');
-          star.setDepth(6);
-          star.setAlpha(0);
-          star.setScale(Phaser.Math.FloatBetween(0.3, 0.8));
-          this.stars.add(star);
-          this.tweens.add({
-            targets: star,
-            alpha: 0.8,
-            duration: Phaser.Math.Between(900, 1800),
-            repeat: -1,
-            yoyo: true,
-            delay: Phaser.Math.Between(0, 1200)
-          });
+            // --- Sparkle ---
+            const sparkleGfx = scene.make.graphics({ x: 0, y: 0, add: false });
+            sparkleGfx.fillStyle(0xffffff, 0.8);
+            sparkleGfx.fillRect(2, 0, 1, 2);
+            sparkleGfx.fillRect(0, 2, 1, 1);
+            sparkleGfx.fillRect(3, 2, 2, 1);
+            sparkleGfx.fillRect(1, 3, 3, 1);
+            sparkleGfx.fillRect(2, 4, 1, 1);
+            sparkleGfx.generateTexture('sparkle', 5, 5);
+            sparkleGfx.destroy();
         }
 
-        this.fireflies = this.add.group();
-        for (let i = 0; i < 28; i++) {
-          const x = Phaser.Math.Between(0, this.worldWidth);
-          const y = Phaser.Math.Between(this.worldHeight * 0.4, this.worldHeight);
-          const f = this.add.image(x, y, 'firefly');
-          f.setDepth(20);
-          f.setAlpha(0);
-          f.setScale(Phaser.Math.FloatBetween(0.5, 1));
-          this.fireflies.add(f);
-          this.tweens.add({
-            targets: f,
-            alpha: 0.9,
-            duration: Phaser.Math.Between(800, 1600),
-            repeat: -1,
-            yoyo: true,
-            delay: Phaser.Math.Between(0, 1000)
-          });
-          this.tweens.add({
-            targets: f,
-            x: x + Phaser.Math.Between(-45, 45),
-            y: y + Phaser.Math.Between(-45, 45),
-            duration: Phaser.Math.Between(3000, 6500),
-            repeat: -1,
-            yoyo: true,
-            ease: 'Sine.easeInOut'
-          });
-        }
-      }
+        // ──────────────────────────────────────────────
+        //  DIALOGUE BOX UI
+        // ──────────────────────────────────────────────
+        function createDialogueBox(scene) {
+            const box = scene.add.graphics();
+            box.setDepth(100);
+            box.setVisible(false);
 
-      createInteractionMarker() {
-        this.marker = this.add.image(0, 0, 'marker');
-        this.marker.setDepth(25);
-        this.marker.setVisible(false);
-        this.tweens.add({
-          targets: this.marker,
-          y: -4,
-          duration: 500,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
-        });
-      }
-
-      setControlsEnabled(enabled) {
-        Game.controlsEnabled = enabled;
-        if (enabled) {
-          joystickZone.classList.remove('disabled');
-          interactBtn.classList.remove('disabled');
-        } else {
-          joystickZone.classList.add('disabled');
-          interactBtn.classList.add('disabled');
-        }
-      }
-
-      setInteractButton(active, label) {
-        if (active) {
-          interactBtn.classList.add('active');
-          interactBtn.textContent = label || '💬';
-        } else {
-          interactBtn.classList.remove('active');
-          interactBtn.textContent = '💬';
-        }
-      }
-
-      // ---------------------------------------------------------
-      //  Opening sequence
-      // ---------------------------------------------------------
-      startOpening() {
-        Game.inCinematic = true;
-        this.setControlsEnabled(false);
-        this.cameras.main.fadeIn(2200, 0, 0, 0);
-        this.cameras.main.centerOn(250, 380);
-        this.player.setPosition(250, 450);
-
-        this.time.delayedCall(2600, () => {
-          const openingLines = [
-            { speaker: AVRIL_NAME, text: 'Where am I...?' },
-            { speaker: AVRIL_NAME, text: 'Wait...' },
-            { speaker: AVRIL_NAME, text: 'Where are you?' },
-            { speaker: AVRIL_NAME, text: "You're not here..." },
-            { speaker: '', text: 'Find him.' }
-          ];
-          this.showDialogue(openingLines, () => {
-            this.showCenteredText('FIND ME', 2600, () => {
-              Game.audio.setMood('day');
-              Game.inCinematic = false;
-              this.setControlsEnabled(true);
-              this.objective = 0;
+            const text = scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 40, '', {
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontSize: '15px',
+                color: '#f5e6d3',
+                align: 'center',
+                wordWrap: { width: GAME_WIDTH - 80 },
+                lineSpacing: 4,
             });
-          }, { autoAdvance: true, lineDelay: 1900 });
-        });
-      }
+            text.setOrigin(0.5, 0.5);
+            text.setDepth(101);
+            text.setVisible(false);
 
-      // ---------------------------------------------------------
-      //  Dialogue system
-      // ---------------------------------------------------------
-      showDialogue(lines, callback, opts = {}) {
-        if (this.dialogueActive) return;
-        this.dialogueLines = lines;
-        this.dialogueIndex = 0;
-        this.dialogueCallback = callback || null;
-        this.autoAdvance = !!opts.autoAdvance;
-        this.autoLineTimer = null;
-        Game.dialogueActive = true;
-        this.setControlsEnabled(false);
-        this.player.body.setVelocity(0);
-
-        dialogueOverlay.classList.add('active');
-        interactBtn.classList.add('dialogue-mode');
-        this.showLine(0);
-      }
-
-      showLine(index) {
-        if (index < 0 || index >= this.dialogueLines.length) {
-          this.endDialogue();
-          return;
-        }
-
-        this.dialogueIndex = index;
-        const line = this.dialogueLines[index];
-        dialogueSpeaker.textContent = line.speaker || '';
-        dialogueSpeaker.style.display = line.speaker ? 'block' : 'none';
-
-        this.typewriterText(line.text, dialogueText, () => {
-          if (this.autoAdvance) {
-            const delay = line.pauseAfter || 1800;
-            this.autoLineTimer = this.time.delayedCall(delay, () => this.nextLine());
-          }
-        });
-      }
-
-      typewriterText(text, el, cb) {
-        this.typing = true;
-        this.typewriterCb = cb || null;
-        el.textContent = '';
-        let i = 0;
-        const step = () => {
-          if (i < text.length) {
-            el.textContent += text.charAt(i);
-            i++;
-            this.typewriterTimer = setTimeout(step, 24);
-          } else {
-            this.typing = false;
-            const done = this.typewriterCb;
-            this.typewriterCb = null;
-            done && done();
-          }
-        };
-        step();
-      }
-
-      completeTyping() {
-        if (!this.typing) return;
-        clearTimeout(this.typewriterTimer);
-        const line = this.dialogueLines[this.dialogueIndex];
-        dialogueText.textContent = line.text;
-        this.typing = false;
-        const cb = this.typewriterCb;
-        this.typewriterCb = null;
-        cb && cb();
-      }
-
-      advanceDialogue() {
-        if (!Game.dialogueActive) return;
-
-        if (this.typing) {
-          Game.audio.playSFX('interact');
-          this.completeTyping();
-          return;
-        }
-
-        if (this.autoLineTimer) {
-          this.autoLineTimer.remove();
-          this.autoLineTimer = null;
-        }
-
-        Game.audio.playSFX('interact');
-        this.nextLine();
-      }
-
-      nextLine() {
-        if (this.typing) return;
-        this.dialogueIndex++;
-        if (this.dialogueIndex < this.dialogueLines.length) {
-          this.showLine(this.dialogueIndex);
-        } else {
-          this.endDialogue();
-        }
-      }
-
-      endDialogue() {
-        dialogueOverlay.classList.remove('active');
-        interactBtn.classList.remove('dialogue-mode');
-        Game.dialogueActive = false;
-        this.dialogueLines = [];
-        this.dialogueIndex = 0;
-        this.setControlsEnabled(!Game.inCinematic);
-        this.player.body.setVelocity(0);
-        const cb = this.dialogueCallback;
-        this.dialogueCallback = null;
-        cb && cb();
-      }
-
-      // ---------------------------------------------------------
-      //  Centered text helper
-      // ---------------------------------------------------------
-      showCenteredText(text, duration, callback) {
-        finalTextOverlay.classList.add('active');
-        finalText.textContent = text;
-        finalText.style.opacity = 1;
-        this.time.delayedCall(duration, () => {
-          finalTextOverlay.classList.remove('active');
-          callback && callback();
-        });
-      }
-
-      showTextSequence(lines, callback) {
-        let idx = 0;
-        finalTextOverlay.classList.add('active');
-        finalText.style.opacity = 1;
-        const showNext = () => {
-          if (idx >= lines.length) {
-            finalTextOverlay.classList.remove('active');
-            callback && callback();
-            return;
-          }
-          finalText.textContent = lines[idx];
-          finalText.style.opacity = 0;
-          requestAnimationFrame(() => { finalText.style.opacity = 1; });
-          idx++;
-          this.time.delayedCall(2300, () => {
-            finalText.style.opacity = 0;
-            this.time.delayedCall(500, showNext);
-          });
-        };
-        showNext();
-      }
-
-      // ---------------------------------------------------------
-      //  Interaction system
-      // ---------------------------------------------------------
-      getActiveInteractables() {
-        const list = [];
-        if (this.npc1 && this.npc1.active && this.objective === 0) list.push(this.npc1);
-        if (this.npc2 && this.npc2.active && this.objective === 2) list.push(this.npc2);
-        if (this.npc3 && this.npc3.active && this.objective === 3) list.push(this.npc3);
-        if (this.clue1 && this.clue1.active && this.clue1.visible && this.objective === 1) list.push(this.clue1);
-        if (this.memoryObject && this.memoryObject.active && this.memoryObject.visible && this.objective === 4) list.push(this.memoryObject);
-        return list;
-      }
-
-      updateInteractionMarker() {
-        if (Game.dialogueActive || !Game.controlsEnabled || Game.inCinematic) {
-          this.marker.setVisible(false);
-          this.setInteractButton(false);
-          this.currentInteractable = null;
-          return;
-        }
-
-        const player = this.player;
-        let closest = null;
-        let minDist = 130;
-        for (const ent of this.getActiveInteractables()) {
-          if (!ent || !ent.active) continue;
-          const d = Phaser.Math.Distance.Between(player.x, player.y, ent.x, ent.y);
-          if (d < minDist) {
-            minDist = d;
-            closest = ent;
-          }
-        }
-
-        this.currentInteractable = closest;
-        if (closest) {
-          this.marker.setVisible(true);
-          this.marker.setPosition(closest.x, closest.y - 32);
-          this.setInteractButton(true, closest.label || 'Talk');
-        } else {
-          this.marker.setVisible(false);
-          this.setInteractButton(false);
-        }
-      }
-
-      handleInteract() {
-        if (Game.dialogueActive) {
-          this.advanceDialogue();
-          return;
-        }
-        if (!Game.controlsEnabled || Game.inCinematic) return;
-        const ent = this.currentInteractable;
-        if (!ent || !ent.active) return;
-
-        Game.audio.playSFX('interact');
-
-        if (ent.id === 'npc1') this.triggerNPC1();
-        else if (ent.id === 'npc2') this.triggerNPC2();
-        else if (ent.id === 'npc3') this.triggerNPC3();
-        else if (ent.id === 'clue1') this.triggerClue1();
-        else if (ent.id === 'memory') this.triggerMemory();
-      }
-
-      triggerNPC1() {
-        const lines = [
-          { speaker: 'NPC', text: "You're looking for someone, aren't you?" },
-          { speaker: AVRIL_NAME, text: 'Yes...' },
-          { speaker: 'NPC', text: "Then you're going the right way." },
-          { speaker: AVRIL_NAME, text: 'You know where he is?' },
-          { speaker: 'NPC', text: 'Not exactly.' },
-          { speaker: 'NPC', text: 'But he left something for you.' }
-        ];
-        this.showDialogue(lines, () => {
-          this.objective = 1;
-          this.clue1.setVisible(true);
-          this.clue1.active = true;
-          Game.audio.playSFX('clue');
-          this.setControlsEnabled(true);
-        });
-      }
-
-      triggerClue1() {
-        Game.audio.playSFX('clue');
-        const lines = [
-          { speaker: '', text: "If you're reading this, you're already getting closer." },
-          { speaker: '', text: 'Keep going.' }
-        ];
-        this.showDialogue(lines, () => {
-          this.objective = 2;
-          this.clue1.destroy();
-          this.clue1 = null;
-          this.setControlsEnabled(true);
-        });
-      }
-
-      triggerNPC2() {
-        const lines = [
-          { speaker: 'NPC', text: 'He talked about you a lot.' },
-          { speaker: AVRIL_NAME, text: 'He did?' },
-          { speaker: 'NPC', text: "He said there's one thing he never gets tired of." },
-          { speaker: AVRIL_NAME, text: 'What?' },
-          { speaker: 'NPC', text: 'Hearing your voice.' },
-          { speaker: '', text: '...' },
-          { speaker: 'NPC', text: 'He always said it made even ordinary days feel special.' },
-          { speaker: '', text: 'I could listen to you talk forever.' }
-        ];
-        this.showDialogue(lines, () => {
-          this.objective = 3;
-          this.triggerNightTransition();
-        });
-      }
-
-      triggerNightTransition() {
-        this.setControlsEnabled(false);
-        Game.inCinematic = true;
-        this.cameras.main.fadeOut(1000, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-          Game.audio.setMood('night');
-          this.nightOverlay.setVisible(true);
-          this.cameras.main.setBackgroundColor('#0a1030');
-          this.stars.children.iterate((s) => s.setAlpha(0.8));
-          this.fireflies.children.iterate((f) => f.setAlpha(0.8));
-          this.cameras.main.fadeIn(1400, 0, 0, 0);
-          this.cameras.main.once('camerafadeincomplete', () => {
-            Game.inCinematic = false;
-            this.setControlsEnabled(true);
-          });
-        });
-      }
-
-      triggerNPC3() {
-        const lines = [
-          { speaker: 'NPC', text: 'He always waits here.' },
-          { speaker: AVRIL_NAME, text: 'For me?' },
-          { speaker: 'NPC', text: 'Maybe.' },
-          { speaker: '', text: '...' },
-          { speaker: 'NPC', text: 'He told me something once.' },
-          { speaker: AVRIL_NAME, text: 'What?' },
-          { speaker: 'NPC', text: 'He always waits under the stars.' },
-          { speaker: '', text: "Maybe someday we'll look at the same sky together." }
-        ];
-        this.showDialogue(lines, () => {
-          this.objective = 4;
-          this.memoryObject.setVisible(true);
-          this.memoryObject.active = true;
-          this.setControlsEnabled(true);
-        });
-      }
-
-      triggerMemory() {
-        Game.audio.playSFX('memory');
-        this.setControlsEnabled(false);
-        Game.inCinematic = true;
-        this.cameras.main.fadeOut(500, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-          Game.audio.setMood('memory');
-          this.memoryObject.destroy();
-          this.memoryObject = null;
-          memoryOverlay.classList.add('active');
-          this.cycleMemoryLines([
-            'Talking',
-            'Laughing',
-            'Waiting for messages',
-            'Looking at the phone',
-            'Watching the night sky'
-          ], () => {
-            memoryOverlay.classList.remove('active');
-            this.cameras.main.fadeIn(500, 0, 0, 0);
-            this.cameras.main.once('camerafadeincomplete', () => {
-              const lines = [
-                { speaker: '', text: 'Distance gave us a lot of reasons to miss each other.' },
-                { speaker: '', text: 'But it never gave me a reason to stop choosing you.' }
-              ];
-              this.showDialogue(lines, () => {
-                this.objective = 5;
-                this.startFinalPath();
-              });
+            const promptText = scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 18, '[Space]', {
+                fontFamily: 'Georgia, serif',
+                fontSize: '11px',
+                color: '#c0a080',
+                align: 'center',
             });
-          });
-        });
-      }
+            promptText.setOrigin(0.5, 0.5);
+            promptText.setDepth(101);
+            promptText.setVisible(false);
 
-      cycleMemoryLines(lines, callback) {
-        let idx = 0;
-        memoryText.style.transition = 'opacity 0.6s ease';
-        const show = (i) => {
-          if (i >= lines.length) {
-            callback && callback();
-            return;
-          }
-          memoryText.textContent = lines[i];
-          memoryText.style.opacity = 0;
-          requestAnimationFrame(() => { memoryText.style.opacity = 1; });
-          this.time.delayedCall(1700, () => {
-            memoryText.style.opacity = 0;
-            this.time.delayedCall(500, () => show(i + 1));
-          });
-        };
-        show(0);
-      }
-
-      startFinalPath() {
-        this.setControlsEnabled(false);
-        Game.inCinematic = true;
-        Game.audio.setMood('final');
-
-        // Clean up remaining NPCs
-        if (this.npc1) this.npc1.destroy();
-        if (this.npc2) this.npc2.destroy();
-        if (this.npc3) this.npc3.destroy();
-        this.nightOverlay.setVisible(false);
-        this.sunsetOverlay.setVisible(true);
-        this.cameras.main.setBackgroundColor('#e89a6a');
-
-        this.showCenteredText('Follow the path...', 1600, () => {
-          Game.inCinematic = false;
-          this.setControlsEnabled(true);
-          this.finalPathActive = true;
-        });
-      }
-
-      checkFinalPath() {
-        if (this.finalPathActive && !this.revealTriggered && this.player.x > 2200) {
-          this.revealTriggered = true;
-          this.startReveal();
-        }
-      }
-
-      startReveal() {
-        this.finalPathActive = false;
-        this.setControlsEnabled(false);
-        Game.inCinematic = true;
-        joystickZone.classList.add('fade-out');
-        interactBtn.classList.add('fade-out');
-        this.player.body.setVelocity(0);
-        this.playerMe.setVisible(true);
-        this.playerMe.setPosition(2450, 800);
-        this.player.setPosition(2200, 800);
-        this.cameras.main.pan(2400, 800, 1600, 'Sine.easeInOut');
-        this.time.delayedCall(1600, () => {
-          const lines = [
-            { speaker: MY_NAME, text: "I've been waiting for you." },
-            { speaker: AVRIL_NAME, text: 'I found you.' },
-            { speaker: MY_NAME, text: 'You did.' },
-            { speaker: '', text: '...' },
-            { speaker: MY_NAME, text: 'I knew you would.' }
-          ];
-          this.showDialogue(lines, () => this.startHug());
-        });
-      }
-
-      startHug() {
-        this.setControlsEnabled(false);
-        Game.audio.setMood('final');
-
-        this.tweens.add({
-          targets: this.player,
-          x: 2300,
-          duration: 1200,
-          ease: 'Sine.easeInOut'
-        });
-        this.tweens.add({
-          targets: this.playerMe,
-          x: 2280,
-          duration: 1200,
-          ease: 'Sine.easeInOut'
-        });
-
-        this.time.delayedCall(1300, () => this.spawnHearts());
-        this.time.delayedCall(4800, () => this.showLetter());
-      }
-
-      spawnHearts() {
-        for (let i = 0; i < 10; i++) {
-          const x = Phaser.Math.Between(2220, 2380);
-          const y = Phaser.Math.Between(700, 850);
-          const heart = this.add.image(x, y, 'heart').setDepth(20);
-          heart.setScale(0.5);
-          heart.setAlpha(0.95);
-          this.tweens.add({
-            targets: heart,
-            y: y - Phaser.Math.Between(30, 65),
-            x: x + Phaser.Math.Between(-15, 15),
-            alpha: 0,
-            scale: 1,
-            duration: Phaser.Math.Between(1000, 1900),
-            ease: 'Sine.easeOut',
-            onComplete: () => heart.destroy()
-          });
-        }
-      }
-
-      showLetter() {
-        Game.inCinematic = true;
-        this.cameras.main.fadeOut(1000, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-          Game.audio.setMood('letter');
-          letterOverlay.classList.add('active');
-          startLetterTypewriter();
-        });
-      }
-
-      showFinalScene() {
-        Game.inCinematic = true;
-        Game.audio.setMood('ending');
-        this.sunsetOverlay.setVisible(true);
-        this.cameras.main.setBackgroundColor('#e89a6a');
-        this.cameras.main.centerOn(280, 380);
-
-        this.player.setPosition(260, 380);
-        this.playerMe.setPosition(310, 380);
-        this.playerMe.setVisible(true);
-        this.player.setVisible(true);
-        this.player.setFlipX(false);
-        this.playerMe.setFlipX(true);
-
-        this.fireflies.children.iterate((f) => f.setAlpha(0.85));
-        this.stars.children.iterate((s) => s.setAlpha(0.6));
-
-        this.cameras.main.fadeIn(900, 0, 0, 0);
-        this.cameras.main.once('camerafadeincomplete', () => {
-          const lines = [
-            'You found me.',
-            "And I'd find you again.",
-            ANNIVERSARY_TEXT,
-            "Our story isn't over yet."
-          ];
-          this.showTextSequence(lines, () => {
-            this.cameras.main.fadeOut(1600, 0, 0, 0);
-            this.cameras.main.once('camerafadeoutcomplete', () => {
-              endOverlay.classList.add('active');
-            });
-          });
-        });
-      }
-
-      update() {
-        // Movement
-        if (Game.controlsEnabled && !Game.dialogueActive && !Game.inCinematic) {
-          const v = Game.inputVector;
-          if (v.x !== 0 || v.y !== 0) {
-            this.player.body.setVelocity(v.x * 180, v.y * 180);
-            if (v.x < 0) this.player.setFlipX(true);
-            else if (v.x > 0) this.player.setFlipX(false);
-          } else {
-            this.player.body.setVelocity(0);
-          }
-        } else if (this.player.body) {
-          this.player.body.setVelocity(0);
+            return {
+                box,
+                text,
+                promptText,
+                show(lines) {
+                    GameState.dialogueActive = true;
+                    GameState.currentDialogue = Array.isArray(lines) ? lines : [lines];
+                    GameState.dialogueIndex = 0;
+                    box.clear();
+                    box.fillStyle(0x1a1018, 0.88);
+                    box.fillRoundedRect(20, GAME_HEIGHT - 85, GAME_WIDTH - 40, 65, 10);
+                    box.lineStyle(1, 0x5a4030, 0.7);
+                    box.strokeRoundedRect(20, GAME_HEIGHT - 85, GAME_WIDTH - 40, 65, 10);
+                    box.setVisible(true);
+                    text.setText(GameState.currentDialogue[0]);
+                    text.setVisible(true);
+                    promptText.setVisible(GameState.currentDialogue.length > 1 || true);
+                },
+                hide() {
+                    GameState.dialogueActive = false;
+                    GameState.currentDialogue = [];
+                    GameState.dialogueIndex = 0;
+                    box.setVisible(false);
+                    text.setVisible(false);
+                    promptText.setVisible(false);
+                },
+                advance() {
+                    GameState.dialogueIndex++;
+                    if (GameState.dialogueIndex < GameState.currentDialogue.length) {
+                        text.setText(GameState.currentDialogue[GameState.dialogueIndex]);
+                        promptText.setVisible(
+                            GameState.dialogueIndex < GameState.currentDialogue.length - 1);
+                    } else {
+                        this.hide();
+                        return true; // finished
+                    }
+                    return false;
+                },
+            };
         }
 
-        this.updateInteractionMarker();
-        this.checkFinalPath();
-      }
-    }
+        // ──────────────────────────────────────────────
+        //  BOOT SCENE – Generate all textures
+        // ──────────────────────────────────────────────
+        class BootScene extends Phaser.Scene {
+            constructor() {
+                super('BootScene');
+            }
 
-    // ---------------------------------------------------------------
-    //  Letter typewriter
-    // ---------------------------------------------------------------
-    const FULL_LETTER = LETTER_PARAGRAPHS.join('\n\n');
-    let letterTyping = false;
-    let letterTimer = null;
-    let letterIndex = 0;
-
-    function startLetterTypewriter() {
-      letterText.textContent = '';
-      letterBtn.style.display = 'none';
-      letterTyping = true;
-      letterIndex = 0;
-      letterTimer = setInterval(() => {
-        if (letterIndex < FULL_LETTER.length) {
-          letterText.textContent += FULL_LETTER.charAt(letterIndex);
-          letterIndex++;
-        } else {
-          clearInterval(letterTimer);
-          letterTyping = false;
-          letterBtn.style.display = 'block';
+            create() {
+                createPixelTextures(this);
+                this.scene.start('OpeningScene');
+            }
         }
-      }, 32);
-    }
 
-    function skipLetterTyping() {
-      if (!letterTyping) return;
-      clearInterval(letterTimer);
-      letterText.textContent = FULL_LETTER;
-      letterTyping = false;
-      letterBtn.style.display = 'block';
-    }
+        // ──────────────────────────────────────────────
+        //  OPENING SCENE – Fade in, titles
+        // ──────────────────────────────────────────────
+        class OpeningScene extends Phaser.Scene {
+            constructor() {
+                super('OpeningScene');
+            }
 
-    // ---------------------------------------------------------------
-    //  Phaser config & boot
-    // ---------------------------------------------------------------
-    window.addEventListener('load', () => {
-      const config = {
-        type: Phaser.AUTO,
-        parent: 'game-container',
-        backgroundColor: '#8db5d6',
-        width: window.innerWidth,
-        height: window.innerHeight,
-        pixelArt: true,
-        roundPixels: true,
-        physics: {
-          default: 'arcade',
-          arcade: {
-            gravity: { y: 0 },
-            debug: false
-          }
-        },
-        scale: {
-          mode: Phaser.Scale.RESIZE,
-          autoCenter: Phaser.Scale.CENTER_BOTH,
-          width: '100%',
-          height: '100%'
-        },
-        scene: [GameScene]
-      };
+            create() {
+                GameState.sceneName = 'opening';
+                this.cameras.main.fadeIn(2000, 0, 0, 0);
+                this.cameras.main.setBackgroundColor('#000000');
 
-      new Phaser.Game(config);
-    });
+                music.stopAll();
+                music.isPlaying = true;
+                music.setVolume(0.22);
+                music.playWarmMelody();
 
-    // Make initial joystick disabled state visible
-    joystickZone.classList.add('disabled');
-  </script>
+                const cx = GAME_WIDTH / 2;
+                const cy = GAME_HEIGHT / 2;
+
+                // Soft warm glow
+                const glow = this.add.graphics();
+                glow.fillStyle(0xff9944, 0.06);
+                glow.fillCircle(cx, cy, 180);
+                glow.setDepth(0);
+
+                // First line
+                const line1 = this.add.text(cx, cy - 30, '', {
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                    fontSize: '22px',
+                    color: '#f5e0c8',
+                    align: 'center',
+                });
+                line1.setOrigin(0.5);
+                line1.setAlpha(0);
+                line1.setDepth(2);
+
+                // Second line
+                const line2 = this.add.text(cx, cy + 15, '', {
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                    fontSize: '16px',
+                    color: '#d4b896',
+                    align: 'center',
+                });
+                line2.setOrigin(0.5);
+                line2.setAlpha(0);
+                line2.setDepth(2);
+
+                // Title
+                const title = this.add.text(cx, cy + 60, '', {
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                    fontSize: '28px',
+                    color: '#ffe0c0',
+                    align: 'center',
+                    fontStyle: 'italic',
+                });
+                title.setOrigin(0.5);
+                title.setAlpha(0);
+                title.setDepth(2);
+
+                // Subtle particles
+                const particles = this.add.particles(0, 0, 'sparkle', {
+                    x: { min: 0, max: GAME_WIDTH },
+                    y: { min: GAME_HEIGHT - 40, max: GAME_HEIGHT },
+                    speedY: { min: -25, max: -50 },
+                    speedX: { min: -15, max: 15 },
+                    alpha: { start: 0.7, end: 0 },
+                    scale: { start: 0.6, end: 0 },
+                    lifespan: 3000,
+                    frequency: 400,
+                    quantity: 1,
+                    blendMode: 'ADD',
+                });
+                particles.setDepth(1);
+
+                // Sequence
+                this.time.delayedCall(1500, () => {
+                    this.tweens.add({
+                        targets: line1,
+                        alpha: 1,
+                        duration: 1500,
+                        ease: 'Sine.easeInOut',
+                    });
+                    line1.setText('"If we could meet..."');
+                });
+
+                this.time.delayedCall(4000, () => {
+                    this.tweens.add({
+                        targets: line1,
+                        alpha: 0.3,
+                        duration: 800,
+                    });
+                    this.tweens.add({
+                        targets: line2,
+                        alpha: 1,
+                        duration: 1500,
+                        ease: 'Sine.easeInOut',
+                    });
+                    line2.setText("I'd walk every distance just to be with you.");
+                });
+
+                this.time.delayedCall(7000, () => {
+                    this.tweens.add({
+                        targets: line1,
+                        alpha: 0,
+                        duration: 600,
+                    });
+                    this.tweens.add({
+                        targets: line2,
+                        alpha: 0.4,
+                        duration: 600,
+                    });
+                    this.tweens.add({
+                        targets: title,
+                        alpha: 1,
+                        duration: 2000,
+                        ease: 'Sine.easeInOut',
+                    });
+                    title.setText('If We Could Meet');
+                });
+
+                this.time.delayedCall(10500, () => {
+                    this.cameras.main.fadeOut(1500, 0, 0, 0);
+                });
+
+                this.time.delayedCall(12000, () => {
+                    this.scene.start('Scene1');
+                });
+
+                // Skip option
+                this.input.keyboard.once('keydown-SPACE', () => {
+                    this.cameras.main.fadeOut(600, 0, 0, 0);
+                    this.time.delayedCall(600, () => {
+                        this.scene.start('Scene1');
+                    });
+                });
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  SCENE 1 – The Beginning (Sunset Path)
+        // ──────────────────────────────────────────────
+        class Scene1 extends Phaser.Scene {
+            constructor() {
+                super('Scene1');
+            }
+
+            create() {
+                GameState.sceneName = 'scene1';
+                GameState.canMove = true;
+                GameState.playerSpeed = GameState.normalSpeed;
+                GameState.dialogueActive = false;
+                GameState.nearInteractable = null;
+                GameState.approachingHer = false;
+
+                this.cameras.main.fadeIn(1200, 0, 0, 0);
+                this.cameras.main.setBackgroundColor('#3a2010');
+
+                // --- Sky gradient ---
+                const skyGfx = this.add.graphics();
+                skyGfx.setDepth(-10);
+                for (let i = 0; i < GAME_HEIGHT; i++) {
+                    const t = i / GAME_HEIGHT;
+                    const r = Math.floor(80 + t * 60);
+                    const g = Math.floor(30 + t * 40);
+                    const b = Math.floor(60 + t * 50);
+                    skyGfx.fillStyle(Phaser.Display.Color.GetColor(r, g, b), 1);
+                    skyGfx.fillRect(0, i, GAME_WIDTH, 1);
+                }
+
+                // --- Sun ---
+                const sunGfx = this.add.graphics();
+                sunGfx.setDepth(-9);
+                sunGfx.fillStyle(0xffcc66, 0.6);
+                sunGfx.fillCircle(520, 70, 50);
+                sunGfx.fillStyle(0xffeeaa, 0.35);
+                sunGfx.fillCircle(520, 70, 70);
+
+                // --- Distant hills ---
+                const hillsGfx = this.add.graphics();
+                hillsGfx.setDepth(-8);
+                hillsGfx.fillStyle(0x5a6040, 0.7);
+                hillsGfx.fillEllipse(150, 250, 350, 160);
+                hillsGfx.fillEllipse(420, 260, 400, 150);
+                hillsGfx.fillStyle(0x6a7050, 0.6);
+                hillsGfx.fillEllipse(300, 270, 500, 140);
+
+                // --- Ground ---
+                this.groundY = 310;
+                const groundGfx = this.add.graphics();
+                groundGfx.setDepth(-5);
+                groundGfx.fillStyle(0x7a9a40);
+                groundGfx.fillRect(0, this.groundY, GAME_WIDTH, GAME_HEIGHT - this.groundY);
+                groundGfx.fillStyle(0x8aaa50);
+                groundGfx.fillRect(0, this.groundY, GAME_WIDTH, 6);
+
+                // --- Path ---
+                const pathGfx = this.add.graphics();
+                pathGfx.setDepth(-4);
+                pathGfx.fillStyle(0xb8a070);
+                pathGfx.fillRect(0, this.groundY + 4, GAME_WIDTH, 32);
+                pathGfx.fillStyle(0xc8b080);
+                pathGfx.fillRect(0, this.groundY + 6, GAME_WIDTH, 18);
+                // Path texture dots
+                for (let x = 0; x < GAME_WIDTH; x += 15) {
+                    pathGfx.fillStyle(0xa89060, 0.4);
+                    pathGfx.fillCircle(x + Math.sin(x * 0.3) * 5, this.groundY + 15 + Math.cos(x * 0.5) * 6, 2);
+                }
+
+                // --- Trees ---
+                this.createTree(80, this.groundY - 35, 1.0);
+                this.createTree(180, this.groundY - 30, 0.8);
+                this.createTree(350, this.groundY - 40, 1.1);
+                this.createTree(500, this.groundY - 28, 0.75);
+                this.createTree(580, this.groundY - 36, 0.9);
+
+                // --- Falling leaves ---
+                this.leafParticles = this.add.particles(0, 0, 'leaf', {
+                    x: { min: 0, max: GAME_WIDTH },
+                    y: { min: -20, max: 60 },
+                    speedY: { min: 20, max: 50 },
+                    speedX: { min: -15, max: 20 },
+                    rotate: { min: 0, max: 360 },
+                    alpha: { start: 0.8, end: 0 },
+                    scale: { start: 0.8, end: 0.3 },
+                    lifespan: 8000,
+                    frequency: 600,
+                    quantity: 1,
+                });
+                this.leafParticles.setDepth(5);
+
+                // --- Birds ---
+                this.birds = [];
+                this.createBirdFlock();
+
+                // --- Old Phone (interactable) ---
+                this.phoneX = 420;
+                this.phoneY = this.groundY - 10;
+                this.phoneSprite = this.add.graphics();
+                this.phoneSprite.setDepth(1);
+                this.drawPhone(this.phoneSprite, this.phoneX, this.phoneY);
+                this.phoneZone = this.add.zone(this.phoneX, this.phoneY, 50, 40);
+                this.phoneZone.setOrigin(0.5, 1);
+                this.physics.world.enable(this.phoneZone);
+                this.phoneZone.body.setAllowGravity(false);
+                this.phoneZone.body.setImmovable(true);
+
+                // --- Phone glow ---
+                this.phoneGlow = this.add.graphics();
+                this.phoneGlow.setDepth(0);
+                this.phoneGlow.fillStyle(0xffcc88, 0.25);
+                this.phoneGlow.fillCircle(this.phoneX, this.phoneY - 5, 20);
+                this.tweens.add({
+                    targets: this.phoneGlow,
+                    alpha: 0.5,
+                    duration: 1500,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut',
+                });
+
+                // --- Player ---
+                this.player = this.physics.add.sprite(60, this.groundY - 12, 'player');
+                this.player.setScale(3);
+                this.player.setDepth(10);
+                this.player.setCollideWorldBounds(true);
+                this.player.body.setSize(10, 18);
+                this.player.body.setOffset(3, 4);
+                this.player.setOrigin(0.5, 1);
+
+                // --- Camera ---
+                this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+                this.cameras.main.setFollowOffset(0, 20);
+                this.cameras.main.setBounds(0, 0, GAME_WIDTH * 1.5, GAME_HEIGHT);
+                this.physics.world.setBounds(0, 0, GAME_WIDTH * 1.5, GAME_HEIGHT);
+
+                // --- World bounds extension ---
+                this.worldEndX = GAME_WIDTH * 1.4;
+
+                // --- Dialogue box ---
+                this.dialogueUI = createDialogueBox(this);
+
+                // --- Interact prompt ---
+                this.interactPrompt = this.add.text(0, 0, '[E] Interact', {
+                    fontFamily: 'Georgia, serif',
+                    fontSize: '12px',
+                    color: '#ffe8c0',
+                    backgroundColor: '#00000088',
+                    padding: { x: 6, y: 3 },
+                });
+                this.interactPrompt.setOrigin(0.5);
+                this.interactPrompt.setDepth(50);
+                this.interactPrompt.setVisible(false);
+
+                // --- Controls ---
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.keyW = this.input.keyboard.addKey('W');
+                this.keyA = this.input.keyboard.addKey('A');
+                this.keyS = this.input.keyboard.addKey('S');
+                this.keyD = this.input.keyboard.addKey('D');
+                this.keyE = this.input.keyboard.addKey('E');
+                this.keySpace = this.input.keyboard.addKey('SPACE');
+
+                // --- Auto dialogue trigger distance ---
+                this.phoneInteracted = false;
+                this.sceneEndTriggered = false;
+
+                // --- Music ---
+                music.stopAll();
+                music.isPlaying = true;
+                music.setVolume(0.22);
+                music.playWarmMelody();
+            }
+
+            createTree(x, y, scale) {
+                const gfx = this.add.graphics();
+                gfx.setDepth(-3);
+                // Trunk
+                gfx.fillStyle(0x6b4433);
+                gfx.fillRect(x - 4 * scale, y, 8 * scale, 30 * scale);
+                // Canopy
+                gfx.fillStyle(0x5a8a30);
+                gfx.fillCircle(x, y - 5 * scale, 22 * scale);
+                gfx.fillStyle(0x4a7a25);
+                gfx.fillCircle(x - 8 * scale, y + 2 * scale, 16 * scale);
+                gfx.fillStyle(0x6a9a40);
+                gfx.fillCircle(x + 8 * scale, y - 2 * scale, 18 * scale);
+            }
+
+            drawPhone(gfx, x, y) {
+                // Small pixel phone on a post
+                gfx.fillStyle(0x554433);
+                gfx.fillRect(x - 3, y - 22, 6, 22);
+                gfx.fillStyle(0xcc8844);
+                gfx.fillRect(x - 8, y - 26, 16, 10);
+                gfx.fillStyle(0x332211);
+                gfx.fillRect(x - 5, y - 24, 10, 6);
+                gfx.fillStyle(0xeeddcc);
+                gfx.fillRect(x - 2, y - 22, 4, 3);
+            }
+
+            createBirdFlock() {
+                for (let i = 0; i < 4; i++) {
+                    const bird = this.add.graphics();
+                    bird.setDepth(8);
+                    const bx = 100 + i * 120 + Math.random() * 60;
+                    const by = 40 + Math.random() * 70;
+                    bird.fillStyle(0x332211);
+                    bird.fillRect(bx, by, 3, 1);
+                    bird.fillRect(bx + 1, by - 1, 1, 2);
+                    bird.fillRect(bx - 1, by - 1, 1, 2);
+                    this.birds.push({ gfx: bird, x: bx, y: by, speed: 0.3 + Math.random() * 0.5, amplitude: 15 + Math
+                            .random() * 20, offset: Math.random() * Math.PI * 2 });
+                }
+            }
+
+            update(time, delta) {
+                if (GameState.dialogueActive) {
+                    this.player.setVelocityX(0);
+                    return;
+                }
+                if (!GameState.canMove) {
+                    this.player.setVelocityX(0);
+                    return;
+                }
+
+                // Bird animation
+                this.birds.forEach(b => {
+                    b.x += b.speed;
+                    if (b.x > GAME_WIDTH + 40) b.x = -40;
+                    b.y += Math.sin(time * 0.002 + b.offset) * 0.3;
+                    b.gfx.clear();
+                    b.gfx.fillStyle(0x332211);
+                    const wingFlap = Math.sin(time * 0.008 + b.offset) > 0;
+                    b.gfx.fillRect(b.x, b.y, 3, 1);
+                    if (wingFlap) {
+                        b.gfx.fillRect(b.x + 1, b.y - 2, 1, 3);
+                        b.gfx.fillRect(b.x - 1, b.y - 2, 1, 3);
+                    } else {
+                        b.gfx.fillRect(b.x + 1, b.y - 1, 1, 2);
+                        b.gfx.fillRect(b.x - 1, b.y - 1, 1, 2);
+                    }
+                });
+
+                // Player movement
+                let vx = 0;
+                if (this.cursors.left.isDown || this.keyA.isDown) vx = -GameState.playerSpeed;
+                else if (this.cursors.right.isDown || this.keyD.isDown) vx = GameState.playerSpeed;
+
+                this.player.setVelocityX(vx);
+
+                // Flip sprite
+                if (vx < 0) this.player.setFlipX(true);
+                else if (vx > 0) this.player.setFlipX(false);
+
+                // Check proximity to phone
+                const distToPhone = Phaser.Math.Distance.Between(
+                    this.player.x, this.player.y, this.phoneX, this.phoneY
+                );
+                if (distToPhone < 45 && !this.phoneInteracted && !GameState.dialogueActive) {
+                    this.interactPrompt.setPosition(this.phoneX, this.phoneY - 40);
+                    this.interactPrompt.setVisible(true);
+                    GameState.nearInteractable = 'phone';
+                } else if (distToPhone >= 45 && GameState.nearInteractable === 'phone') {
+                    this.interactPrompt.setVisible(false);
+                    GameState.nearInteractable = null;
+                }
+
+                // Check if player reached the end
+                if (this.player.x > this.worldEndX - 30 && !this.sceneEndTriggered) {
+                    this.sceneEndTriggered = true;
+                    this.cameras.main.fadeOut(1500, 0, 0, 0);
+                    this.time.delayedCall(1500, () => {
+                        this.scene.start('Scene2');
+                    });
+                }
+
+                // E key interaction
+                if (Phaser.Input.Keyboard.JustDown(this.keyE) && GameState.nearInteractable === 'phone' && !this
+                    .phoneInteracted) {
+                    this.phoneInteracted = true;
+                    this.interactPrompt.setVisible(false);
+                    GameState.canMove = false;
+                    this.player.setVelocityX(0);
+                    this.dialogueUI.show([
+                        'This is where everything began.',
+                        'The first message.',
+                        'The first smile.',
+                        'I never imagined a simple conversation\nwould change my life.',
+                    ]);
+                }
+
+                // Space to advance dialogue
+                if (Phaser.Input.Keyboard.JustDown(this.keySpace) && GameState.dialogueActive) {
+                    const finished = this.dialogueUI.advance();
+                    if (finished && this.phoneInteracted && !this.sceneEndTriggered) {
+                        GameState.canMove = true;
+                    }
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  SCENE 2 – The Rain
+        // ──────────────────────────────────────────────
+        class Scene2 extends Phaser.Scene {
+            constructor() {
+                super('Scene2');
+            }
+
+            create() {
+                GameState.sceneName = 'scene2';
+                GameState.canMove = true;
+                GameState.playerSpeed = GameState.slowSpeed;
+                GameState.dialogueActive = false;
+                GameState.nearInteractable = null;
+                GameState.approachingHer = false;
+
+                this.cameras.main.fadeIn(1200, 40, 40, 55);
+                this.cameras.main.setBackgroundColor('#282840');
+
+                // --- Grey-blue sky ---
+                const skyGfx = this.add.graphics();
+                skyGfx.setDepth(-10);
+                for (let i = 0; i < GAME_HEIGHT; i++) {
+                    const t = i / GAME_HEIGHT;
+                    const r = Math.floor(40 + t * 30);
+                    const g = Math.floor(40 + t * 30);
+                    const b = Math.floor(55 + t * 35);
+                    skyGfx.fillStyle(Phaser.Display.Color.GetColor(r, g, b), 1);
+                    skyGfx.fillRect(0, i, GAME_WIDTH, 1);
+                }
+
+                // --- Dark ground ---
+                this.groundY = 310;
+                const groundGfx = this.add.graphics();
+                groundGfx.setDepth(-5);
+                groundGfx.fillStyle(0x5a6a35);
+                groundGfx.fillRect(0, this.groundY, GAME_WIDTH, GAME_HEIGHT - this.groundY);
+                groundGfx.fillStyle(0x4a5a28);
+                groundGfx.fillRect(0, this.groundY, GAME_WIDTH, 4);
+
+                // --- Muddy path ---
+                const pathGfx = this.add.graphics();
+                pathGfx.setDepth(-4);
+                pathGfx.fillStyle(0x887755);
+                pathGfx.fillRect(0, this.groundY + 3, GAME_WIDTH, 30);
+
+                // --- Bare trees ---
+                this.createBareTree(100, this.groundY - 30, 0.9);
+                this.createBareTree(250, this.groundY - 35, 1.0);
+                this.createBareTree(400, this.groundY - 28, 0.8);
+                this.createBareTree(550, this.groundY - 33, 0.95);
+
+                // --- Rain particles ---
+                this.rainParticles = this.add.particles(0, 0, 'raindrop', {
+                    x: { min: -40, max: GAME_WIDTH + 40 },
+                    y: { min: -60, max: -10 },
+                    speedY: { min: 250, max: 450 },
+                    speedX: { min: -30, max: -10 },
+                    alpha: { start: 0.6, end: 0.2 },
+                    scale: { start: 1.2, end: 0.8 },
+                    lifespan: 2000,
+                    frequency: 30,
+                    quantity: 2,
+                });
+                this.rainParticles.setDepth(8);
+
+                // --- Puddle reflections ---
+                for (let i = 0; i < 5; i++) {
+                    const px = 50 + i * 130 + Math.random() * 40;
+                    const py = this.groundY + 10 + Math.random() * 14;
+                    const puddle = this.add.graphics();
+                    puddle.setDepth(1);
+                    puddle.fillStyle(0x667799, 0.4);
+                    puddle.fillEllipse(px, py, 35 + Math.random() * 25, 8 + Math.random() * 6);
+                }
+
+                // --- Player ---
+                this.player = this.physics.add.sprite(60, this.groundY - 12, 'player');
+                this.player.setScale(3);
+                this.player.setDepth(10);
+                this.player.setCollideWorldBounds(true);
+                this.player.body.setSize(10, 18);
+                this.player.body.setOffset(3, 4);
+                this.player.setOrigin(0.5, 1);
+
+                // --- World ---
+                this.worldEndX = GAME_WIDTH * 1.4;
+                this.physics.world.setBounds(0, 0, this.worldEndX, GAME_HEIGHT);
+                this.cameras.main.setBounds(0, 0, this.worldEndX, GAME_HEIGHT);
+                this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+                this.cameras.main.setFollowOffset(0, 20);
+
+                // --- Dialogue ---
+                this.dialogueUI = createDialogueBox(this);
+                this.autoDialogueShown = false;
+                this.sceneEndTriggered = false;
+
+                // --- Controls ---
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.keyA = this.input.keyboard.addKey('A');
+                this.keyD = this.input.keyboard.addKey('D');
+                this.keySpace = this.input.keyboard.addKey('SPACE');
+
+                // --- Auto dialogue after a short walk ---
+                this.dialogueTriggerX = 200;
+
+                // --- Music ---
+                music.stopAll();
+                music.isPlaying = true;
+                music.setVolume(0.18);
+                music.playSoftMelody();
+            }
+
+            createBareTree(x, y, scale) {
+                const gfx = this.add.graphics();
+                gfx.setDepth(-3);
+                gfx.fillStyle(0x4a3530);
+                gfx.fillRect(x - 3 * scale, y, 6 * scale, 28 * scale);
+                // Bare branches
+                gfx.fillStyle(0x3a2825);
+                gfx.fillRect(x - 12 * scale, y - 6 * scale, 10 * scale, 3 * scale);
+                gfx.fillRect(x + 3 * scale, y - 10 * scale, 9 * scale, 3 * scale);
+                gfx.fillRect(x - 5 * scale, y - 14 * scale, 8 * scale, 2 * scale);
+            }
+
+            update(time, delta) {
+                if (GameState.dialogueActive) {
+                    this.player.setVelocityX(0);
+                    return;
+                }
+                if (!GameState.canMove) {
+                    this.player.setVelocityX(0);
+                    return;
+                }
+
+                let vx = 0;
+                if (this.cursors.left.isDown || this.keyA.isDown) vx = -GameState.playerSpeed;
+                else if (this.cursors.right.isDown || this.keyD.isDown) vx = GameState.playerSpeed;
+                this.player.setVelocityX(vx);
+                if (vx < 0) this.player.setFlipX(true);
+                else if (vx > 0) this.player.setFlipX(false);
+
+                // Auto dialogue trigger
+                if (this.player.x > this.dialogueTriggerX && !this.autoDialogueShown) {
+                    this.autoDialogueShown = true;
+                    GameState.canMove = false;
+                    this.player.setVelocityX(0);
+                    this.dialogueUI.show([
+                        "Distance isn't always measured in kilometers.",
+                        "Sometimes it's measured in moments\nwhen I wish you were beside me.",
+                        "But I'd keep walking anyway.",
+                    ]);
+                }
+
+                // End of scene
+                if (this.player.x > this.worldEndX - 30 && !this.sceneEndTriggered) {
+                    this.sceneEndTriggered = true;
+                    this.cameras.main.fadeOut(1500, 40, 40, 55);
+                    this.time.delayedCall(1500, () => {
+                        this.scene.start('Scene3');
+                    });
+                }
+
+                if (Phaser.Input.Keyboard.JustDown(this.keySpace) && GameState.dialogueActive) {
+                    const finished = this.dialogueUI.advance();
+                    if (finished && this.autoDialogueShown) {
+                        GameState.canMove = true;
+                        GameState.playerSpeed = GameState.slowSpeed;
+                    }
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  SCENE 3 – The Night (Fireflies & Stars)
+        // ──────────────────────────────────────────────
+        class Scene3 extends Phaser.Scene {
+            constructor() {
+                super('Scene3');
+            }
+
+            create() {
+                GameState.sceneName = 'scene3';
+                GameState.canMove = true;
+                GameState.playerSpeed = GameState.normalSpeed;
+                GameState.dialogueActive = false;
+                GameState.nearInteractable = null;
+                GameState.approachingHer = false;
+
+                this.cameras.main.fadeIn(1500, 10, 10, 30);
+                this.cameras.main.setBackgroundColor('#0a0a20');
+
+                // --- Night sky ---
+                const skyGfx = this.add.graphics();
+                skyGfx.setDepth(-10);
+                for (let i = 0; i < GAME_HEIGHT; i++) {
+                    const t = i / GAME_HEIGHT;
+                    skyGfx.fillStyle(Phaser.Display.Color.GetColor(
+                        Math.floor(8 + t * 15),
+                        Math.floor(8 + t * 15),
+                        Math.floor(25 + t * 20)
+                    ), 1);
+                    skyGfx.fillRect(0, i, GAME_WIDTH, 1);
+                }
+
+                // --- Stars ---
+                this.stars = [];
+                for (let i = 0; i < 60; i++) {
+                    const sx = Math.random() * GAME_WIDTH;
+                    const sy = Math.random() * (GAME_HEIGHT * 0.6);
+                    const star = this.add.graphics();
+                    star.setDepth(-7);
+                    const brightness = 0.5 + Math.random() * 0.5;
+                    star.fillStyle(0xffffff, brightness);
+                    star.fillRect(sx, sy, 1.5, 1.5);
+                    this.stars.push({ gfx: star, x: sx, y: sy, twinkleSpeed: 500 + Math.random() * 2000, brightness });
+                }
+
+                // --- Moon ---
+                const moonGfx = this.add.graphics();
+                moonGfx.setDepth(-8);
+                moonGfx.fillStyle(0xeeeedd, 0.7);
+                moonGfx.fillCircle(500, 55, 28);
+                moonGfx.fillStyle(0x0a0a20, 0.8);
+                moonGfx.fillCircle(510, 48, 22);
+
+                // --- Ground ---
+                this.groundY = 310;
+                const groundGfx = this.add.graphics();
+                groundGfx.setDepth(-5);
+                groundGfx.fillStyle(0x2a3a20);
+                groundGfx.fillRect(0, this.groundY, GAME_WIDTH, GAME_HEIGHT - this.groundY);
+                groundGfx.fillStyle(0x3a4a30);
+                groundGfx.fillRect(0, this.groundY, GAME_WIDTH, 5);
+
+                // --- Forest trees ---
+                this.createNightTree(60, this.groundY - 40, 1.2);
+                this.createNightTree(180, this.groundY - 35, 1.0);
+                this.createNightTree(300, this.groundY - 45, 1.3);
+                this.createNightTree(440, this.groundY - 30, 0.9);
+                this.createNightTree(560, this.groundY - 38, 1.1);
+
+                // --- Fireflies ---
+                this.fireflyParticles = this.add.particles(0, 0, 'firefly', {
+                    x: { min: 40, max: GAME_WIDTH - 40 },
+                    y: { min: this.groundY - 100, max: this.groundY + 20 },
+                    speedY: { min: -15, max: 15 },
+                    speedX: { min: -20, max: 20 },
+                    alpha: { start: 0.9, end: 0.1 },
+                    scale: { start: 0.7, end: 0.2 },
+                    lifespan: 3000,
+                    frequency: 200,
+                    quantity: 1,
+                    blendMode: 'ADD',
+                });
+                this.fireflyParticles.setDepth(6);
+
+                // --- Individual fireflies with glow ---
+                this.fireflyGlows = [];
+                for (let i = 0; i < 15; i++) {
+                    const fx = 40 + Math.random() * (GAME_WIDTH - 80);
+                    const fy = this.groundY - 80 + Math.random() * 100;
+                    const glow = this.add.graphics();
+                    glow.setDepth(5);
+                    glow.fillStyle(0xffff88, 0.3);
+                    glow.fillCircle(fx, fy, 8 + Math.random() * 10);
+                    this.fireflyGlows.push({ gfx: glow, x: fx, y: fy, baseX: fx, baseY: fy, phase: Math.random() * Math
+                            .PI * 2, speed: 0.3 + Math.random() * 0.7 });
+                }
+
+                // --- Bench (interactable) ---
+                this.benchX = 380;
+                this.benchY = this.groundY - 4;
+                this.benchSprite = this.add.graphics();
+                this.benchSprite.setDepth(3);
+                this.drawBench(this.benchSprite, this.benchX, this.benchY);
+                this.benchZone = this.add.zone(this.benchX, this.benchY, 60, 35);
+                this.benchZone.setOrigin(0.5, 1);
+                this.physics.world.enable(this.benchZone);
+                this.benchZone.body.setAllowGravity(false);
+                this.benchZone.body.setImmovable(true);
+
+                // --- Player ---
+                this.player = this.physics.add.sprite(60, this.groundY - 12, 'player');
+                this.player.setScale(3);
+                this.player.setDepth(10);
+                this.player.setCollideWorldBounds(true);
+                this.player.body.setSize(10, 18);
+                this.player.body.setOffset(3, 4);
+                this.player.setOrigin(0.5, 1);
+
+                // --- World ---
+                this.worldEndX = GAME_WIDTH * 1.4;
+                this.physics.world.setBounds(0, 0, this.worldEndX, GAME_HEIGHT);
+                this.cameras.main.setBounds(0, 0, this.worldEndX, GAME_HEIGHT);
+                this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+                this.cameras.main.setFollowOffset(0, 20);
+
+                // --- Dialogue ---
+                this.dialogueUI = createDialogueBox(this);
+                this.benchInteracted = false;
+                this.sceneEndTriggered = false;
+
+                // --- Interact prompt ---
+                this.interactPrompt = this.add.text(0, 0, '[E] Sit & think', {
+                    fontFamily: 'Georgia, serif',
+                    fontSize: '12px',
+                    color: '#e8e0ff',
+                    backgroundColor: '#00000088',
+                    padding: { x: 6, y: 3 },
+                });
+                this.interactPrompt.setOrigin(0.5);
+                this.interactPrompt.setDepth(50);
+                this.interactPrompt.setVisible(false);
+
+                // --- Controls ---
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.keyA = this.input.keyboard.addKey('A');
+                this.keyD = this.input.keyboard.addKey('D');
+                this.keyE = this.input.keyboard.addKey('E');
+                this.keySpace = this.input.keyboard.addKey('SPACE');
+
+                // --- Music ---
+                music.stopAll();
+                music.isPlaying = true;
+                music.setVolume(0.16);
+                music.playNightMelody();
+            }
+
+            createNightTree(x, y, scale) {
+                const gfx = this.add.graphics();
+                gfx.setDepth(-3);
+                gfx.fillStyle(0x1a1815);
+                gfx.fillRect(x - 4 * scale, y, 8 * scale, 32 * scale);
+                gfx.fillStyle(0x1a2a15);
+                gfx.fillCircle(x, y - 6 * scale, 24 * scale);
+                gfx.fillStyle(0x152510);
+                gfx.fillCircle(x - 6 * scale, y, 18 * scale);
+                gfx.fillCircle(x + 7 * scale, y - 2 * scale, 16 * scale);
+            }
+
+            drawBench(gfx, x, y) {
+                gfx.fillStyle(0x5a4030);
+                gfx.fillRect(x - 18, y - 8, 36, 4);
+                gfx.fillRect(x - 18, y - 2, 36, 3);
+                gfx.fillStyle(0x4a3020);
+                gfx.fillRect(x - 16, y - 6, 2, 18);
+                gfx.fillRect(x + 14, y - 6, 2, 18);
+                gfx.fillRect(x - 14, y + 8, 28, 2);
+            }
+
+            update(time, delta) {
+                if (GameState.dialogueActive) {
+                    this.player.setVelocityX(0);
+                    return;
+                }
+                if (!GameState.canMove) {
+                    this.player.setVelocityX(0);
+                    return;
+                }
+
+                // Twinkle stars
+                this.stars.forEach(s => {
+                    const alpha = 0.3 + 0.7 * Math.abs(Math.sin(time / s.twinkleSpeed + s.x));
+                    s.gfx.clear();
+                    s.gfx.fillStyle(0xffffff, alpha * s.brightness);
+                    s.gfx.fillRect(s.x, s.y, 1.5, 1.5);
+                });
+
+                // Animate firefly glows
+                this.fireflyGlows.forEach(f => {
+                    f.x = f.baseX + Math.sin(time * 0.001 * f.speed + f.phase) * 35;
+                    f.y = f.baseY + Math.cos(time * 0.0013 * f.speed + f.phase) * 25;
+                    f.gfx.clear();
+                    const alpha = 0.2 + 0.4 * Math.abs(Math.sin(time * 0.003 + f.phase));
+                    f.gfx.fillStyle(0xffff88, alpha);
+                    f.gfx.fillCircle(f.x, f.y, 8);
+                });
+
+                let vx = 0;
+                if (this.cursors.left.isDown || this.keyA.isDown) vx = -GameState.playerSpeed;
+                else if (this.cursors.right.isDown || this.keyD.isDown) vx = GameState.playerSpeed;
+                this.player.setVelocityX(vx);
+                if (vx < 0) this.player.setFlipX(true);
+                else if (vx > 0) this.player.setFlipX(false);
+
+                // Bench proximity
+                const distToBench = Phaser.Math.Distance.Between(
+                    this.player.x, this.player.y, this.benchX, this.benchY
+                );
+                if (distToBench < 50 && !this.benchInteracted && !GameState.dialogueActive) {
+                    this.interactPrompt.setPosition(this.benchX, this.benchY - 30);
+                    this.interactPrompt.setVisible(true);
+                    GameState.nearInteractable = 'bench';
+                } else if (distToBench >= 50 && GameState.nearInteractable === 'bench') {
+                    this.interactPrompt.setVisible(false);
+                    GameState.nearInteractable = null;
+                }
+
+                if (Phaser.Input.Keyboard.JustDown(this.keyE) && GameState.nearInteractable === 'bench' && !this
+                    .benchInteracted) {
+                    this.benchInteracted = true;
+                    this.interactPrompt.setVisible(false);
+                    GameState.canMove = false;
+                    this.player.setVelocityX(0);
+                    this.dialogueUI.show([
+                        'If only we could watch the stars together.',
+                        'I wonder what that day will feel like.',
+                        "I'll keep believing it'll happen.",
+                    ]);
+                }
+
+                if (this.player.x > this.worldEndX - 30 && !this.sceneEndTriggered) {
+                    this.sceneEndTriggered = true;
+                    this.cameras.main.fadeOut(1500, 10, 10, 30);
+                    this.time.delayedCall(1500, () => {
+                        this.scene.start('Scene4');
+                    });
+                }
+
+                if (Phaser.Input.Keyboard.JustDown(this.keySpace) && GameState.dialogueActive) {
+                    const finished = this.dialogueUI.advance();
+                    if (finished && this.benchInteracted) {
+                        GameState.canMove = true;
+                    }
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  SCENE 4 – The Bridge (Light Gameplay)
+        // ──────────────────────────────────────────────
+        class Scene4 extends Phaser.Scene {
+            constructor() {
+                super('Scene4');
+            }
+
+            create() {
+                GameState.sceneName = 'scene4';
+                GameState.canMove = true;
+                GameState.playerSpeed = GameState.normalSpeed;
+                GameState.dialogueActive = false;
+                GameState.nearInteractable = null;
+                GameState.approachingHer = false;
+                GameState.bridgeFell = false;
+
+                this.cameras.main.fadeIn(1000, 20, 20, 40);
+                this.cameras.main.setBackgroundColor('#1a1a30');
+
+                // --- Sky ---
+                const skyGfx = this.add.graphics();
+                skyGfx.setDepth(-10);
+                for (let i = 0; i < GAME_HEIGHT; i++) {
+                    const t = i / GAME_HEIGHT;
+                    skyGfx.fillStyle(Phaser.Display.Color.GetColor(
+                        Math.floor(25 + t * 30), Math.floor(20 + t * 25), Math.floor(45 + t * 30)
+                    ), 1);
+                    skyGfx.fillRect(0, i, GAME_WIDTH, 1);
+                }
+
+                // --- Chasm background ---
+                this.groundY = 310;
+                const cliffGfx = this.add.graphics();
+                cliffGfx.setDepth(-5);
+                cliffGfx.fillStyle(0x3a3028);
+                cliffGfx.fillRect(0, this.groundY, GAME_WIDTH, GAME_HEIGHT - this.groundY);
+
+                // --- Bridge platforms ---
+                this.bridgeY = this.groundY - 30;
+                this.bridgePlatforms = [];
+                const platformData = [
+                    { x: 60, w: 90 },
+                    { x: 175, w: 70 },
+                    { x: 270, w: 60 },
+                    { x: 355, w: 55 },
+                    { x: 435, w: 65 },
+                    { x: 525, w: 80 },
+                    { x: 630, w: 70 },
+                ];
+
+                platformData.forEach((p, i) => {
+                    const plat = this.add.graphics();
+                    plat.setDepth(2);
+                    plat.fillStyle(0x7a5a3a);
+                    plat.fillRect(p.x, this.bridgeY, p.w, 8);
+                    plat.fillStyle(0x8a6a4a);
+                    plat.fillRect(p.x, this.bridgeY, p.w, 3);
+                    // Wood grain
+                    for (let gx = p.x + 4; gx < p.x + p.w - 4; gx += 8) {
+                        plat.fillStyle(0x6a4a2a, 0.5);
+                        plat.fillRect(gx, this.bridgeY + 5, 3, 2);
+                    }
+                    // Railing posts
+                    if (i > 0 && i < platformData.length - 1) {
+                        plat.fillStyle(0x5a3a20);
+                        plat.fillRect(p.x - 2, this.bridgeY - 14, 3, 14);
+                        plat.fillRect(p.x + p.w - 1, this.bridgeY - 14, 3, 14);
+                    }
+                    this.bridgePlatforms.push({
+                        x: p.x,
+                        y: this.bridgeY,
+                        width: p.w,
+                        gfx: plat,
+                    });
+                });
+
+                // --- Rope lines between platforms ---
+                const ropeGfx = this.add.graphics();
+                ropeGfx.setDepth(1);
+                ropeGfx.lineStyle(1, 0x998877, 0.6);
+                for (let i = 0; i < this.bridgePlatforms.length - 1; i++) {
+                    const p1 = this.bridgePlatforms[i];
+                    const p2 = this.bridgePlatforms[i + 1];
+                    ropeGfx.beginPath();
+                    ropeGfx.moveTo(p1.x + p1.width, p1.y - 10);
+                    ropeGfx.lineTo(p2.x, p2.y - 10);
+                    ropeGfx.strokePath();
+                }
+
+                // --- Gap markers (visual only) ---
+                const gapGfx = this.add.graphics();
+                gapGfx.setDepth(-1);
+                for (let i = 0; i < this.bridgePlatforms.length - 1; i++) {
+                    const p1 = this.bridgePlatforms[i];
+                    const p2 = this.bridgePlatforms[i + 1];
+                    const gapStart = p1.x + p1.width;
+                    const gapEnd = p2.x;
+                    gapGfx.fillStyle(0x0a0a15, 0.5);
+                    gapGfx.fillRect(gapStart, this.bridgeY - 5, gapEnd - gapStart, 50);
+                }
+
+                // --- Fog/mist in the chasm ---
+                const mistGfx = this.add.graphics();
+                mistGfx.setDepth(0);
+                mistGfx.fillStyle(0x8899aa, 0.15);
+                mistGfx.fillRect(0, this.bridgeY + 10, GAME_WIDTH, 60);
+
+                // --- Player ---
+                this.player = this.physics.add.sprite(40, this.bridgeY - 14, 'player');
+                this.player.setScale(3);
+                this.player.setDepth(10);
+                this.player.setCollideWorldBounds(false);
+                this.player.body.setSize(10, 18);
+                this.player.body.setOffset(3, 4);
+                this.player.setOrigin(0.5, 1);
+                this.player.body.setAllowGravity(true);
+
+                // --- Ground level (safety net - invisible floor far below) ---
+                this.safetyY = this.bridgeY + 80;
+                this.safetyZone = this.add.zone(GAME_WIDTH / 2, this.safetyY, GAME_WIDTH, 10);
+                this.physics.world.enable(this.safetyZone);
+                this.safetyZone.body.setAllowGravity(false);
+                this.safetyZone.body.setImmovable(true);
+
+                // --- World ---
+                this.worldEndX = 720;
+                this.physics.world.setBounds(0, 0, this.worldEndX, GAME_HEIGHT + 100);
+                this.cameras.main.setBounds(0, 0, this.worldEndX, GAME_HEIGHT);
+                this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+                this.cameras.main.setFollowOffset(0, 15);
+
+                // --- Dialogue ---
+                this.dialogueUI = createDialogueBox(this);
+                this.midDialogueShown = false;
+                this.sceneEndTriggered = false;
+                this.playerFell = false;
+
+                // --- Controls ---
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.keyA = this.input.keyboard.addKey('A');
+                this.keyD = this.input.keyboard.addKey('D');
+                this.keyW = this.input.keyboard.addKey('W');
+                this.keySpace = this.input.keyboard.addKey('SPACE');
+                this.keyUp = this.input.keyboard.addKey('UP');
+
+                // --- Music ---
+                music.stopAll();
+                music.isPlaying = true;
+                music.setVolume(0.17);
+                music.playSoftMelody();
+
+                // --- Bridge shake timer ---
+                this.bridgeShakeTime = 0;
+                this.bridgeShaking = false;
+            }
+
+            update(time, delta) {
+                if (GameState.dialogueActive) {
+                    this.player.setVelocityX(0);
+                    return;
+                }
+                if (!GameState.canMove) {
+                    this.player.setVelocityX(0);
+                    return;
+                }
+
+                // Check if player fell
+                if (this.player.y > this.bridgeY + 55 && !this.playerFell) {
+                    this.playerFell = true;
+                    // Soft reset
+                    this.cameras.main.fadeOut(400, 20, 20, 40);
+                    this.time.delayedCall(400, () => {
+                        this.player.setPosition(40, this.bridgeY - 14);
+                        this.player.setVelocity(0, 0);
+                        this.playerFell = false;
+                        this.cameras.main.fadeIn(400, 20, 20, 40);
+                    });
+                }
+
+                // Mid-bridge dialogue trigger
+                if (this.player.x > 280 && !this.midDialogueShown) {
+                    this.midDialogueShown = true;
+                    GameState.canMove = false;
+                    this.player.setVelocityX(0);
+                    this.bridgeShaking = true;
+                    this.bridgeShakeTime = time;
+                    this.dialogueUI.show([
+                        'Some days are difficult.',
+                        'I get scared.',
+                        'I overthink.',
+                        'But leaving you behind was never\none of my choices.',
+                    ]);
+                }
+
+                // Bridge shake effect
+                if (this.bridgeShaking && time - this.bridgeShakeTime < 3000) {
+                    const shakeX = Math.sin(time * 0.02) * 2;
+                    this.cameras.main.setFollowOffset(shakeX, 15);
+                } else if (this.bridgeShaking && time - this.bridgeShakeTime >= 3000) {
+                    this.bridgeShaking = false;
+                    this.cameras.main.setFollowOffset(0, 15);
+                }
+
+                let vx = 0;
+                if (this.cursors.left.isDown || this.keyA.isDown) vx = -GameState.playerSpeed;
+                else if (this.cursors.right.isDown || this.keyD.isDown) vx = GameState.playerSpeed;
+                this.player.setVelocityX(vx);
+                if (vx < 0) this.player.setFlipX(true);
+                else if (vx > 0) this.player.setFlipX(false);
+
+                // Jump
+                const jumpPressed = Phaser.Input.Keyboard.JustDown(this.keyUp) ||
+                    Phaser.Input.Keyboard.JustDown(this.keyW) ||
+                    Phaser.Input.Keyboard.JustDown(this.keySpace);
+                if (jumpPressed && this.isPlayerOnAnyPlatform()) {
+                    this.player.setVelocityY(-280);
+                }
+
+                // End of scene
+                if (this.player.x > this.worldEndX - 20 && !this.sceneEndTriggered) {
+                    this.sceneEndTriggered = true;
+                    this.cameras.main.fadeOut(1500, 20, 20, 40);
+                    this.time.delayedCall(1500, () => {
+                        this.scene.start('Scene5');
+                    });
+                }
+
+                if (Phaser.Input.Keyboard.JustDown(this.keySpace) && GameState.dialogueActive) {
+                    const finished = this.dialogueUI.advance();
+                    if (finished && this.midDialogueShown) {
+                        GameState.canMove = true;
+                    }
+                }
+            }
+
+            isPlayerOnAnyPlatform() {
+                for (const plat of this.bridgePlatforms) {
+                    const px = this.player.x;
+                    const py = this.player.y;
+                    if (
+                        px > plat.x - 5 &&
+                        px < plat.x + plat.width + 5 &&
+                        py >= plat.y - 18 &&
+                        py <= plat.y + 6 &&
+                        this.player.body.velocity.y >= -10
+                    ) {
+                        // Snap to platform
+                        this.player.y = plat.y - 14;
+                        this.player.setVelocityY(0);
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  SCENE 5 – The Flower Field (Morning, Meeting)
+        // ──────────────────────────────────────────────
+        class Scene5 extends Phaser.Scene {
+            constructor() {
+                super('Scene5');
+            }
+
+            create() {
+                GameState.sceneName = 'scene5';
+                GameState.canMove = true;
+                GameState.playerSpeed = GameState.normalSpeed;
+                GameState.dialogueActive = false;
+                GameState.nearInteractable = null;
+                GameState.approachingHer = false;
+                GameState.metHer = false;
+
+                this.cameras.main.fadeIn(1800, 255, 240, 220);
+                this.cameras.main.setBackgroundColor('#faf0e0');
+
+                // --- Morning sky ---
+                const skyGfx = this.add.graphics();
+                skyGfx.setDepth(-10);
+                for (let i = 0; i < GAME_HEIGHT; i++) {
+                    const t = i / GAME_HEIGHT;
+                    skyGfx.fillStyle(Phaser.Display.Color.GetColor(
+                        Math.floor(240 + t * 10),
+                        Math.floor(210 + t * 20),
+                        Math.floor(180 + t * 30)
+                    ), 1);
+                    skyGfx.fillRect(0, i, GAME_WIDTH, 1);
+                }
+
+                // --- Sunlight rays ---
+                const raysGfx = this.add.graphics();
+                raysGfx.setDepth(-7);
+                raysGfx.fillStyle(0xffffcc, 0.08);
+                for (let i = 0; i < 8; i++) {
+                    const rx = 100 + i * 70;
+                    raysGfx.fillTriangle(rx, 0, rx - 30, GAME_HEIGHT, rx + 30, GAME_HEIGHT);
+                }
+
+                // --- Ground ---
+                this.groundY = 320;
+                const groundGfx = this.add.graphics();
+                groundGfx.setDepth(-5);
+                groundGfx.fillStyle(0x8ab840);
+                groundGfx.fillRect(0, this.groundY, GAME_WIDTH, GAME_HEIGHT - this.groundY);
+                groundGfx.fillStyle(0x9ac850);
+                groundGfx.fillRect(0, this.groundY, GAME_WIDTH, 5);
+
+                // --- Flowers ---
+                this.flowers = [];
+                const flowerColors = [0xff7799, 0xff9977, 0xffcc66, 0xff88aa, 0xeecc77, 0xffaacc, 0xdd9966];
+                for (let i = 0; i < 50; i++) {
+                    const fx = 30 + Math.random() * (GAME_WIDTH - 60);
+                    const fy = this.groundY - 2 - Math.random() * 8;
+                    const fc = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+                    const flower = this.add.graphics();
+                    flower.setDepth(4);
+                    flower.fillStyle(0x558833);
+                    flower.fillRect(fx, fy, 1, 6);
+                    flower.fillStyle(fc);
+                    flower.fillCircle(fx + 0.5, fy - 1, 3);
+                    this.flowers.push({ gfx: flower, x: fx, y: fy });
+                }
+
+                // --- Floating petals ---
+                this.petalParticles = this.add.particles(0, 0, 'petal', {
+                    x: { min: 0, max: GAME_WIDTH },
+                    y: { min: -20, max: GAME_HEIGHT },
+                    speedY: { min: 10, max: 30 },
+                    speedX: { min: -20, max: 20 },
+                    rotate: { min: 0, max: 360 },
+                    alpha: { start: 0.8, end: 0 },
+                    scale: { start: 1, end: 0.3 },
+                    lifespan: 10000,
+                    frequency: 300,
+                    quantity: 1,
+                });
+                this.petalParticles.setDepth(6);
+
+                // --- The Girl (far away) ---
+                this.girlX = 620;
+                this.girlY = this.groundY - 12;
+                this.girlSprite = this.add.sprite(this.girlX, this.girlY, 'girl');
+                this.girlSprite.setScale(3);
+                this.girlSprite.setDepth(9);
+                this.girlSprite.setOrigin(0.5, 1);
+                this.girlSprite.setAlpha(0.85);
+
+                // --- Soft glow around girl ---
+                this.girlGlow = this.add.graphics();
+                this.girlGlow.setDepth(8);
+                this.girlGlow.fillStyle(0xffddee, 0.2);
+                this.girlGlow.fillCircle(this.girlX, this.girlY - 8, 30);
+
+                // --- Player ---
+                this.player = this.physics.add.sprite(40, this.groundY - 12, 'player');
+                this.player.setScale(3);
+                this.player.setDepth(10);
+                this.player.setCollideWorldBounds(true);
+                this.player.body.setSize(10, 18);
+                this.player.body.setOffset(3, 4);
+                this.player.setOrigin(0.5, 1);
+
+                // --- World ---
+                this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+                this.cameras.main.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+                this.cameras.main.startFollow(this.player, true, 0.06, 0.06);
+                this.cameras.main.setFollowOffset(0, 15);
+
+                // --- Dialogue ---
+                this.dialogueUI = createDialogueBox(this);
+                this.approachStarted = false;
+                this.sceneTransitioning = false;
+
+                // --- Controls ---
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.keyA = this.input.keyboard.addKey('A');
+                this.keyD = this.input.keyboard.addKey('D');
+                this.keySpace = this.input.keyboard.addKey('SPACE');
+
+                // --- Music ---
+                music.stopAll();
+                music.isPlaying = true;
+                music.setVolume(0.24);
+                music.playBrightMelody();
+            }
+
+            update(time, delta) {
+                if (GameState.dialogueActive || this.sceneTransitioning) {
+                    this.player.setVelocityX(0);
+                    return;
+                }
+                if (!GameState.canMove) {
+                    this.player.setVelocityX(0);
+                    return;
+                }
+
+                // Distance to girl
+                const distToGirl = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.girlX, this.girlY);
+
+                // Slow down as we get closer
+                if (distToGirl < 180 && !GameState.approachingHer) {
+                    GameState.approachingHer = true;
+                    GameState.playerSpeed = GameState.verySlowSpeed;
+                }
+                if (distToGirl < 70 && !this.approachStarted) {
+                    this.approachStarted = true;
+                    GameState.playerSpeed = 25;
+                }
+
+                // When close enough, trigger the meeting
+                if (distToGirl < 50 && !this.sceneTransitioning && !GameState.metHer) {
+                    this.triggerMeeting();
+                    return;
+                }
+
+                let vx = 0;
+                if (this.cursors.left.isDown || this.keyA.isDown) vx = -GameState.playerSpeed;
+                else if (this.cursors.right.isDown || this.keyD.isDown) vx = GameState.playerSpeed;
+                this.player.setVelocityX(vx);
+                if (vx < 0) this.player.setFlipX(true);
+                else if (vx > 0) this.player.setFlipX(false);
+
+                // Gentle girl idle animation
+                if (this.girlSprite && !GameState.metHer) {
+                    this.girlSprite.y = this.girlY + Math.sin(time * 0.002) * 1.5;
+                }
+            }
+
+            triggerMeeting() {
+                GameState.metHer = true;
+                GameState.canMove = false;
+                this.sceneTransitioning = true;
+                this.player.setVelocityX(0);
+                this.player.setVelocityY(0);
+
+                // Disable controls message
+                this.time.delayedCall(300, () => {
+                    this.scene.start('FinalScene');
+                });
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  FINAL SCENE – The Meeting & Hug
+        // ──────────────────────────────────────────────
+        class FinalScene extends Phaser.Scene {
+            constructor() {
+                super('FinalScene');
+            }
+
+            create() {
+                GameState.sceneName = 'final';
+                GameState.canMove = false;
+                GameState.dialogueActive = false;
+
+                this.cameras.main.fadeIn(1000, 255, 240, 220);
+                this.cameras.main.setBackgroundColor('#faf0e0');
+
+                // --- Sky ---
+                const skyGfx = this.add.graphics();
+                skyGfx.setDepth(-10);
+                for (let i = 0; i < GAME_HEIGHT; i++) {
+                    const t = i / GAME_HEIGHT;
+                    skyGfx.fillStyle(Phaser.Display.Color.GetColor(
+                        Math.floor(245 + t * 8), Math.floor(220 + t * 15), Math.floor(195 + t * 25)
+                    ), 1);
+                    skyGfx.fillRect(0, i, GAME_WIDTH, 1);
+                }
+
+                // --- Ground ---
+                this.groundY = 320;
+                const groundGfx = this.add.graphics();
+                groundGfx.setDepth(-5);
+                groundGfx.fillStyle(0x8ab840);
+                groundGfx.fillRect(0, this.groundY, GAME_WIDTH, GAME_HEIGHT - this.groundY);
+
+                // --- Flowers ---
+                const flowerColors = [0xff7799, 0xff9977, 0xffcc66, 0xff88aa, 0xeecc77];
+                for (let i = 0; i < 60; i++) {
+                    const fx = 20 + Math.random() * (GAME_WIDTH - 40);
+                    const fy = this.groundY - 2 - Math.random() * 8;
+                    const fc = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+                    const flower = this.add.graphics();
+                    flower.setDepth(4);
+                    flower.fillStyle(0x558833);
+                    flower.fillRect(fx, fy, 1, 6);
+                    flower.fillStyle(fc);
+                    flower.fillCircle(fx + 0.5, fy - 1, 3);
+                }
+
+                // --- Player and Girl starting positions ---
+                this.playerX = 260;
+                this.girlX = 380;
+                this.meetX = 320;
+                this.charY = this.groundY - 12;
+
+                this.playerSprite = this.add.sprite(this.playerX, this.charY, 'player');
+                this.playerSprite.setScale(3);
+                this.playerSprite.setDepth(10);
+                this.playerSprite.setOrigin(0.5, 1);
+
+                this.girlSprite = this.add.sprite(this.girlX, this.charY, 'girl');
+                this.girlSprite.setScale(3);
+                this.girlSprite.setDepth(9);
+                this.girlSprite.setOrigin(0.5, 1);
+                this.girlSprite.setFlipX(true);
+
+                // --- Camera ---
+                this.cameras.main.setScroll(0, 0);
+                this.cameras.main.pan(GAME_WIDTH / 2, this.groundY - 60, 0);
+
+                // --- Music ---
+                music.stopAll();
+                music.isPlaying = true;
+                music.setVolume(0.22);
+                music.playBrightMelody();
+
+                // --- Sequence ---
+                this.time.delayedCall(800, () => {
+                    // Both walk toward each other
+                    this.tweens.add({
+                        targets: this.playerSprite,
+                        x: this.meetX - 10,
+                        duration: 2500,
+                        ease: 'Sine.easeInOut',
+                    });
+                    this.tweens.add({
+                        targets: this.girlSprite,
+                        x: this.meetX + 10,
+                        duration: 2500,
+                        ease: 'Sine.easeInOut',
+                    });
+
+                    // Camera slowly zooms
+                    this.time.delayedCall(1000, () => {
+                        this.cameras.main.zoomTo(1.4, 2000, 'Sine.easeInOut');
+                        this.cameras.main.pan(this.meetX, this.groundY - 40, 2000);
+                    });
+                });
+
+                // When they meet
+                this.time.delayedCall(3400, () => {
+                    // Stop walking
+                    this.tweens.killTweensOf(this.playerSprite);
+                    this.tweens.killTweensOf(this.girlSprite);
+                    this.playerSprite.x = this.meetX - 6;
+                    this.girlSprite.x = this.meetX + 6;
+                    this.playerSprite.setFlipX(false);
+                    this.girlSprite.setFlipX(true);
+
+                    // Brief pause
+                    this.time.delayedCall(600, () => {
+                        // Hug - move closer
+                        this.tweens.add({
+                            targets: this.playerSprite,
+                            x: this.meetX - 2,
+                            duration: 400,
+                            ease: 'Sine.easeInOut',
+                        });
+                        this.tweens.add({
+                            targets: this.girlSprite,
+                            x: this.meetX + 2,
+                            duration: 400,
+                            ease: 'Sine.easeInOut',
+                        });
+
+                        // Heart particles
+                        this.heartParticles = this.add.particles(this.meetX, this.charY - 20, 'heart', {
+                            speedY: { min: -40, max: -80 },
+                            speedX: { min: -30, max: 30 },
+                            alpha: { start: 1, end: 0 },
+                            scale: { start: 1.5, end: 0.4 },
+                            lifespan: 2500,
+                            frequency: 80,
+                            quantity: 2,
+                            blendMode: 'NORMAL',
+                        });
+                        this.heartParticles.setDepth(12);
+
+                        // Petal burst
+                        this.petalBurst = this.add.particles(this.meetX, this.charY - 10, 'petal', {
+                            speedY: { min: -60, max: -20 },
+                            speedX: { min: -50, max: 50 },
+                            alpha: { start: 0.9, end: 0 },
+                            scale: { start: 1.2, end: 0.3 },
+                            rotate: { min: 0, max: 360 },
+                            lifespan: 4000,
+                            frequency: 40,
+                            quantity: 3,
+                        });
+                        this.petalBurst.setDepth(11);
+
+                        // Fireflies
+                        this.fireflyBurst = this.add.particles(this.meetX, this.charY - 15, 'firefly', {
+                            speedY: { min: -35, max: -15 },
+                            speedX: { min: -35, max: 35 },
+                            alpha: { start: 0.9, end: 0 },
+                            scale: { start: 0.8, end: 0.2 },
+                            lifespan: 3500,
+                            frequency: 150,
+                            quantity: 1,
+                            blendMode: 'ADD',
+                        });
+                        this.fireflyBurst.setDepth(13);
+
+                        // Brightness increase
+                        this.cameras.main.flash(2000, 255, 250, 240, true);
+
+                        // Music becomes softer
+                        music.setVolume(0.14);
+                    });
+                });
+
+                // Fade to white
+                this.time.delayedCall(7500, () => {
+                    this.cameras.main.fadeOut(2500, 255, 255, 255);
+                });
+
+                this.time.delayedCall(10000, () => {
+                    this.scene.start('LetterScene');
+                });
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  LETTER SCENE
+        // ──────────────────────────────────────────────
+        class LetterScene extends Phaser.Scene {
+            constructor() {
+                super('LetterScene');
+            }
+
+            create() {
+                GameState.sceneName = 'letter';
+                this.cameras.main.fadeIn(1500, 255, 255, 255);
+                this.cameras.main.setBackgroundColor('#faf8f0');
+
+                const cx = GAME_WIDTH / 2;
+
+                // Paper texture background
+                const paperGfx = this.add.graphics();
+                paperGfx.setDepth(0);
+                paperGfx.fillStyle(0xfdfaf2, 1);
+                paperGfx.fillRect(30, 15, GAME_WIDTH - 60, GAME_HEIGHT - 30);
+                paperGfx.lineStyle(1, 0xe0d5c0, 0.6);
+                paperGfx.strokeRect(30, 15, GAME_WIDTH - 60, GAME_HEIGHT - 30);
+                // Subtle lines
+                for (let y = 40; y < GAME_HEIGHT - 30; y += 20) {
+                    paperGfx.fillStyle(0xe8e0d0, 0.4);
+                    paperGfx.fillRect(50, y, GAME_WIDTH - 100, 1);
+                }
+
+                const letterLines = [
+                    'Happy 17 Months, my love.',
+                    '',
+                    'If I had the chance, I would cross every distance,',
+                    'face every obstacle, and wait through every season',
+                    'just to reach you.',
+                    '',
+                    "Even though we can't always be together physically,",
+                    "you've never felt far from my heart.",
+                    '',
+                    'Thank you for every laugh, every late-night',
+                    'conversation, every memory we\'ve made,',
+                    "and every day you've continued choosing us.",
+                    '',
+                    'No matter how many kilometers separate us,',
+                    "I'll keep walking toward you.",
+                    '',
+                    'And if one day we finally meet...',
+                    'I know every step will have been worth it.',
+                    '',
+                    'Thank you for being my favorite person.',
+                    '',
+                    'Happy 17 Months.',
+                    'I love you.',
+                ];
+
+                const letterText = this.add.text(cx, 38, letterLines.join('\n'), {
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                    fontSize: '12px',
+                    color: '#3a2a1a',
+                    align: 'left',
+                    lineSpacing: 5,
+                    wordWrap: { width: GAME_WIDTH - 120 },
+                });
+                letterText.setOrigin(0.5, 0);
+                letterText.setDepth(2);
+                letterText.setAlpha(0);
+
+                // Fade in letter
+                this.tweens.add({
+                    targets: letterText,
+                    alpha: 1,
+                    duration: 2000,
+                    ease: 'Sine.easeInOut',
+                    delay: 500,
+                });
+
+                // Continue button
+                const btnY = GAME_HEIGHT - 45;
+                const btnGfx = this.add.graphics();
+                btnGfx.setDepth(3);
+                btnGfx.fillStyle(0xd4a080, 1);
+                btnGfx.fillRoundedRect(cx - 50, btnY - 16, 100, 32, 8);
+                btnGfx.lineStyle(1, 0xb08060, 0.8);
+                btnGfx.strokeRoundedRect(cx - 50, btnY - 16, 100, 32, 8);
+
+                const btnText = this.add.text(cx, btnY, 'Continue', {
+                    fontFamily: 'Georgia, serif',
+                    fontSize: '14px',
+                    color: '#fdfaf5',
+                    align: 'center',
+                });
+                btnText.setOrigin(0.5);
+                btnText.setDepth(4);
+
+                // Make button interactive
+                const btnZone = this.add.zone(cx, btnY, 100, 32);
+                btnZone.setInteractive({ useHandCursor: true });
+                btnZone.setDepth(5);
+                btnZone.on('pointerover', () => {
+                    btnGfx.clear();
+                    btnGfx.fillStyle(0xe0b090, 1);
+                    btnGfx.fillRoundedRect(cx - 50, btnY - 16, 100, 32, 8);
+                    btnGfx.lineStyle(1, 0xc09070, 0.9);
+                    btnGfx.strokeRoundedRect(cx - 50, btnY - 16, 100, 32, 8);
+                });
+                btnZone.on('pointerout', () => {
+                    btnGfx.clear();
+                    btnGfx.fillStyle(0xd4a080, 1);
+                    btnGfx.fillRoundedRect(cx - 50, btnY - 16, 100, 32, 8);
+                    btnGfx.lineStyle(1, 0xb08060, 0.8);
+                    btnGfx.strokeRoundedRect(cx - 50, btnY - 16, 100, 32, 8);
+                });
+                btnZone.on('pointerdown', () => {
+                    this.cameras.main.fadeOut(1000, 255, 255, 255);
+                    this.time.delayedCall(1000, () => {
+                        this.scene.start('EndingScene');
+                    });
+                });
+
+                // Also allow Space to continue
+                this.input.keyboard.once('keydown-SPACE', () => {
+                    this.cameras.main.fadeOut(1000, 255, 255, 255);
+                    this.time.delayedCall(1000, () => {
+                        this.scene.start('EndingScene');
+                    });
+                });
+
+                // Music
+                music.stopAll();
+                music.isPlaying = true;
+                music.setVolume(0.15);
+                music.playEndingMelody();
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  ENDING SCENE – Under the Tree
+        // ──────────────────────────────────────────────
+        class EndingScene extends Phaser.Scene {
+            constructor() {
+                super('EndingScene');
+            }
+
+            create() {
+                GameState.sceneName = 'ending';
+                GameState.canMove = false;
+
+                this.cameras.main.fadeIn(2000, 0, 0, 0);
+                this.cameras.main.setBackgroundColor('#1a1020');
+
+                const cx = GAME_WIDTH / 2;
+                const groundY = 300;
+
+                // --- Sunset sky ---
+                const skyGfx = this.add.graphics();
+                skyGfx.setDepth(-10);
+                for (let i = 0; i < GAME_HEIGHT; i++) {
+                    const t = i / GAME_HEIGHT;
+                    skyGfx.fillStyle(Phaser.Display.Color.GetColor(
+                        Math.floor(40 + t * 25),
+                        Math.floor(15 + t * 20),
+                        Math.floor(35 + t * 30)
+                    ), 1);
+                    skyGfx.fillRect(0, i, GAME_WIDTH, 1);
+                }
+
+                // --- Large tree ---
+                const treeGfx = this.add.graphics();
+                treeGfx.setDepth(2);
+                // Trunk
+                treeGfx.fillStyle(0x4a3028);
+                treeGfx.fillRect(cx - 14, groundY - 90, 28, 90);
+                treeGfx.fillStyle(0x5a4035);
+                treeGfx.fillRect(cx - 8, groundY - 85, 16, 80);
+                // Roots
+                treeGfx.fillStyle(0x3a2520);
+                treeGfx.fillRect(cx - 22, groundY - 8, 44, 8);
+                // Canopy
+                treeGfx.fillStyle(0x2a4a20);
+                treeGfx.fillCircle(cx, groundY - 105, 55);
+                treeGfx.fillStyle(0x1a3a15);
+                treeGfx.fillCircle(cx - 25, groundY - 90, 38);
+                treeGfx.fillStyle(0x355a28);
+                treeGfx.fillCircle(cx + 22, groundY - 95, 42);
+                treeGfx.fillStyle(0x2a5022);
+                treeGfx.fillCircle(cx, groundY - 115, 35);
+
+                // --- Ground ---
+                const groundGfx = this.add.graphics();
+                groundGfx.setDepth(-5);
+                groundGfx.fillStyle(0x3a4a28);
+                groundGfx.fillRect(0, groundY, GAME_WIDTH, GAME_HEIGHT - groundY);
+                groundGfx.fillStyle(0x4a5a35);
+                groundGfx.fillRect(0, groundY, GAME_WIDTH, 4);
+
+                // --- Characters sitting ---
+                const sitY = groundY - 6;
+                this.playerSprite = this.add.sprite(cx - 18, sitY, 'player');
+                this.playerSprite.setScale(2.8);
+                this.playerSprite.setDepth(5);
+                this.playerSprite.setOrigin(0.5, 1);
+
+                this.girlSprite = this.add.sprite(cx + 18, sitY, 'girl');
+                this.girlSprite.setScale(2.8);
+                this.girlSprite.setDepth(5);
+                this.girlSprite.setOrigin(0.5, 1);
+
+                // --- Fireflies ---
+                this.fireflyParticles = this.add.particles(0, 0, 'firefly', {
+                    x: { min: cx - 120, max: cx + 120 },
+                    y: { min: groundY - 140, max: groundY + 30 },
+                    speedY: { min: -12, max: 12 },
+                    speedX: { min: -18, max: 18 },
+                    alpha: { start: 0.85, end: 0 },
+                    scale: { start: 0.7, end: 0.2 },
+                    lifespan: 3500,
+                    frequency: 250,
+                    quantity: 1,
+                    blendMode: 'ADD',
+                });
+                this.fireflyParticles.setDepth(6);
+
+                // --- Sparkles ---
+                this.sparkleParticles = this.add.particles(0, 0, 'sparkle', {
+                    x: { min: cx - 100, max: cx + 100 },
+                    y: { min: groundY - 130, max: groundY - 20 },
+                    speedY: { min: -8, max: 8 },
+                    speedX: { min: -10, max: 10 },
+                    alpha: { start: 0.7, end: 0 },
+                    scale: { start: 0.5, end: 0 },
+                    lifespan: 2500,
+                    frequency: 500,
+                    quantity: 1,
+                    blendMode: 'ADD',
+                });
+                this.sparkleParticles.setDepth(7);
+
+                // --- Gentle wind (petals) ---
+                this.windPetals = this.add.particles(0, 0, 'petal', {
+                    x: { min: 0, max: GAME_WIDTH },
+                    y: { min: -10, max: GAME_HEIGHT },
+                    speedY: { min: 5, max: 20 },
+                    speedX: { min: 15, max: 35 },
+                    rotate: { min: 0, max: 360 },
+                    alpha: { start: 0.7, end: 0 },
+                    scale: { start: 0.8, end: 0.2 },
+                    lifespan: 12000,
+                    frequency: 800,
+                    quantity: 1,
+                });
+                this.windPetals.setDepth(4);
+
+                // --- Subtle idle animations ---
+                this.tweens.add({
+                    targets: this.playerSprite,
+                    y: sitY - 1,
+                    duration: 2500,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut',
+                });
+                this.tweens.add({
+                    targets: this.girlSprite,
+                    y: sitY - 1.5,
+                    duration: 2800,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut',
+                });
+
+                // --- Text sequence ---
+                const textStyle = {
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                    fontSize: '17px',
+                    color: '#f0e0d0',
+                    align: 'center',
+                };
+
+                const text1 = this.add.text(cx, groundY + 50, '', textStyle);
+                text1.setOrigin(0.5);
+                text1.setDepth(10);
+                text1.setAlpha(0);
+
+                const text2 = this.add.text(cx, groundY + 75, '', {
+                    ...textStyle,
+                    fontSize: '15px',
+                    color: '#d8c8b8'
+                });
+                text2.setOrigin(0.5);
+                text2.setDepth(10);
+                text2.setAlpha(0);
+
+                const text3 = this.add.text(cx, groundY + 100, '', {
+                    ...textStyle,
+                    fontSize: '14px',
+                    color: '#e8c0c0',
+                    fontStyle: 'italic',
+                });
+                text3.setOrigin(0.5);
+                text3.setDepth(10);
+                text3.setAlpha(0);
+
+                // Sequence
+                this.time.delayedCall(2000, () => {
+                    this.tweens.add({
+                        targets: text1,
+                        alpha: 1,
+                        duration: 1500,
+                    });
+                    text1.setText('Distance never stopped me from choosing you.');
+                });
+
+                this.time.delayedCall(5500, () => {
+                    this.tweens.add({
+                        targets: text2,
+                        alpha: 1,
+                        duration: 1500,
+                    });
+                    text2.setText('Our story is still being written...');
+                });
+
+                this.time.delayedCall(9000, () => {
+                    this.tweens.add({
+                        targets: text3,
+                        alpha: 1,
+                        duration: 1800,
+                    });
+                    text3.setText('Loading...\nMonth 18 ❤️');
+                });
+
+                // Fade to black
+                this.time.delayedCall(14000, () => {
+                    music.setVolume(0.06);
+                    this.cameras.main.fadeOut(4000, 0, 0, 0);
+                });
+
+                this.time.delayedCall(18500, () => {
+                    music.stopAll();
+                    music.isPlaying = false;
+                    // Show final message on black
+                    const finalText = this.add.text(cx, GAME_HEIGHT / 2, '♡', {
+                        fontFamily: 'Georgia, serif',
+                        fontSize: '40px',
+                        color: '#ff8888',
+                        align: 'center',
+                    });
+                    finalText.setOrigin(0.5);
+                    finalText.setDepth(20);
+                    finalText.setAlpha(0);
+                    this.tweens.add({
+                        targets: finalText,
+                        alpha: 1,
+                        duration: 2000,
+                    });
+                    this.tweens.add({
+                        targets: finalText,
+                        alpha: 0,
+                        duration: 3000,
+                        delay: 3000,
+                    });
+                });
+
+                // Music
+                music.stopAll();
+                music.isPlaying = true;
+                music.setVolume(0.14);
+                music.playEndingMelody();
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  ASSEMBLE GAME
+        // ──────────────────────────────────────────────
+        config.scene = [
+            BootScene,
+            OpeningScene,
+            Scene1,
+            Scene2,
+            Scene3,
+            Scene4,
+            Scene5,
+            FinalScene,
+            LetterScene,
+            EndingScene,
+        ];
+
+        const game = new Phaser.Game(config);
+
+        // Handle first user interaction for audio
+        document.addEventListener('click', () => {
+            music.resume();
+        }, { once: true });
+        document.addEventListener('keydown', () => {
+            music.resume();
+        }, { once: true });
+
+        console.log('🌙 "If We Could Meet" - A pixel story game');
+        console.log('💛 Use Arrow Keys or WASD to move');
+        console.log('📱 Press E to interact with objects');
+        console.log('💬 Press Space to continue dialogue');
+        console.log('✨ Enjoy the journey...');
+    </script>
 </body>
 </html>
